@@ -20,7 +20,7 @@ pub fn init() -> Result<(), Box<dyn Error>> {
             };
 
             let time = Local::now().format("%Y-%m-%d %H:%M:%S");
-            let module = record.target();
+            let module = record.target().split("::").last().unwrap_or(record.target());
             out.finish(format_args!("[{}] [{}] [{}] {}", time, level, module, message))
         })
         .chain(std::io::stdout());
@@ -28,7 +28,7 @@ pub fn init() -> Result<(), Box<dyn Error>> {
     let file_dispatch = Dispatch::new()
         .format(|out, message, record| {
             let time = Local::now().format("%Y-%m-%d %H:%M:%S");
-            let module = record.target();
+            let module = record.target().split("::").last().unwrap_or(record.target());
             out.finish(format_args!("[{}] [{}] [{}] {}", time, record.level(), module, message))
         })
         .chain(fern::log_file(file_path)?);
