@@ -1,3 +1,7 @@
+use crate::logger::hytale_logger;
+
+mod logger;
+
 fn main() {
-    println!("Hello, world!");
+    hytale_logger::init().expect("Failed to setup logger");
 }

@@ -15,3 +15,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+log = "0.4.29"
+fern = "0.7.1"
+chrono = "0.4.43"
+colored = "3.1.1"
