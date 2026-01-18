@@ -1,2 +1,4 @@
 /target
 /logs
+/config.json
+/config.json.bak

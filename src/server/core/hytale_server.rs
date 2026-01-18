@@ -1,14 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use log::info;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use tokio::time::sleep;
 use crate::server::core::command::system::command_manager::CommandManager;
 use crate::server::core::hytale_server_config::HytaleServerConfig;
 use crate::server::core::plugin::plugin_manager::PluginManager;
 use crate::event::event_bus::EventBus;
-use crate::server::core::options;
+use crate::server::core::{hytale_server_config, options};
 
 static SERVER_INSTANCE: OnceCell<Arc<HytaleServer>> = OnceCell::new();
 static SHOULD_STOP: AtomicBool = AtomicBool::new(false);
@@ -30,7 +31,9 @@ impl HytaleServer {
         //TODO: setup Store Providers
 
         info!("Loading Config...");
-        //TODO: load config
+        let config_time = Instant::now();
+        let config = hytale_server_config::load();
+        info!("Config Loaded in {:.2?}", config_time.elapsed());
 
         info!("Authentication mode: {}", options::get().auth_mode);
         //TODO: auth
@@ -43,7 +46,7 @@ impl HytaleServer {
             event_bus: Mutex::new(EventBus{}),
             plugin_manager: Mutex::new(PluginManager{}),
             command_manager: Mutex::new(CommandManager{}),
-            hytale_server_config: Mutex::new(HytaleServerConfig{}),
+            hytale_server_config: Mutex::new(config),
             boot_start,
         };
 

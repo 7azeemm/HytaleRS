@@ -1,0 +1,7 @@
+disallowed-types = [
+    { path = "std::sync::Mutex", reason = "Use parking_lot::Mutex", replacement = "parking_lot::Mutex" },
+    { path = "std::sync::RwLock", reason = "Use parking_lot::RwLock", replacement = "parking_lot::RwLock"},
+
+]
+# Use Dashmap instead of Mutex<HashMap<>>?
+# Use AHash instead of HashMap?

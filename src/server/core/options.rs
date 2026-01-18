@@ -188,9 +188,9 @@ pub enum AuthMode {
 impl std::fmt::Display for AuthMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AuthMode::Authenticated => write!(f, "Authenticated"),
-            AuthMode::Offline => write!(f, "Offline"),
-            AuthMode::Insecure => write!(f, "Insecure"),
+            AuthMode::Authenticated => write!(f, "authenticated"),
+            AuthMode::Offline => write!(f, "offline"),
+            AuthMode::Insecure => write!(f, "insecure"),
         }
     }
 }
