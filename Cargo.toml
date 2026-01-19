@@ -2,11 +2,11 @@
 opt-level = 3
 lto = "thin"
 codegen-units = 1
-panic = "abort"
+#panic = "abort"
 
 [profile.dev]
 opt-level = 1
-panic = "abort"
+#panic = "abort"
 incremental = true
 
 [package]
@@ -28,4 +28,7 @@ ahash = "0.8.12"
 rayon = "1.11.0"
 serde_json = "1.0.149"
 serde = { version = "1.0.228", features = ["derive"] }
-semver = { version = "1.0.27", features = ["serde"]}
+semver = { version = "1.0.27", features = ["serde"] }
+uuid = "1.19.0"
+crossbeam-channel = "0.5.15"
+criterion = "0.8.1"

@@ -50,6 +50,7 @@ impl HytaleServer {
             boot_start,
         };
 
+        info!("Server took {:.2?} to start", boot_start.elapsed());
         SERVER_INSTANCE.set(Arc::new(server)).unwrap();
         SERVER_INSTANCE.get().unwrap().clone()
     }

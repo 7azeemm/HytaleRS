@@ -82,8 +82,8 @@ pub struct Options {
     #[arg(long, help = "Maximum number of backups to keep", default_value_t = 5)]
     pub backup_max_count: u32,
 
-    #[arg(long, help = "Singleplayer mode")]
-    pub singleplayer: bool,
+    // #[arg(long, help = "Singleplayer mode")]
+    // pub singleplayer: bool,
 
     #[arg(long, help = "Owner name")]
     pub owner_name: Option<String>,
@@ -118,11 +118,11 @@ pub struct Options {
     #[arg(long, help = "Authentication mode", default_value_t = AuthMode::Authenticated)]
     pub auth_mode: AuthMode,
 
-    #[arg(long, help = "Session token for Session Service API")]
-    pub session_token: Option<String>,
+    // #[arg(long, help = "Session token for Session Service API")]
+    // pub session_token: Option<String>,
 
-    #[arg(long, help = "Identity token (JWT)")]
-    pub identity_token: Option<String>,
+    // #[arg(long, help = "Identity token (JWT)")]
+    // pub identity_token: Option<String>,
 }
 
 pub fn get() -> Arc<Options> {
