@@ -7,6 +7,8 @@ use once_cell::sync::OnceCell;
 
 static OPTIONS: OnceCell<Arc<Options>> = OnceCell::new();
 
+//TODO: NO_LOGS option or check "log"
+
 #[derive(Parser, Debug)]
 #[command(name = "HytaleRS", disable_help_flag = true)]
 pub struct Options {

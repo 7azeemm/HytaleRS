@@ -4,3 +4,4 @@ pub mod plugin;
 pub mod command;
 pub mod options;
 pub mod auth;
+pub mod network;

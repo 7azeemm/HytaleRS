@@ -3,7 +3,7 @@
 use std::sync::LazyLock;
 use log::info;
 use crate::logger::hytale_logger;
-use crate::server::core::hytale_server::HytaleServer;
+use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
 use crate::server::core::options;
 use crate::util::scheduler::scheduler::Scheduler;
 
@@ -19,8 +19,8 @@ pub static GLOBAL_SCHEDULER: LazyLock<Scheduler> = LazyLock::new(|| Scheduler::n
 async fn main() {
     options::parse();
     hytale_logger::init().expect("Failed to setup logger");
-    let server = HytaleServer::new();
+    HYTALE_SERVER.init();
 
-    server.start().await;
+    HYTALE_SERVER.start().await;
     info!("Server Stopped")
 }

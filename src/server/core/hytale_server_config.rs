@@ -117,22 +117,22 @@ impl Default for ConnectionTimeouts {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct RateLimit {
-    enabled: bool,
-    packets_per_second: u32,
-    burst_capacity: u32
+    pub enabled: bool,
+    pub refill_rate: u32,
+    pub max_tokens: u32
 }
 
 impl RateLimit {
-    const DEFAULT_PACKETS_PER_SECOND: u32 = 2000;
-    const DEFAULT_BURST_CAPACITY: u32 = 500;
+    const DEFAULT_REFILL_RATE: u32 = 2000;
+    const DEFAULT_MAX_TOKENS: u32 = 500;
 }
 
 impl Default for RateLimit {
     fn default() -> Self {
         Self {
             enabled: true,
-            packets_per_second: Self::DEFAULT_PACKETS_PER_SECOND,
-            burst_capacity: Self::DEFAULT_BURST_CAPACITY
+            refill_rate: Self::DEFAULT_REFILL_RATE,
+            max_tokens: Self::DEFAULT_MAX_TOKENS
         }
     }
 }
@@ -241,8 +241,8 @@ mod tests {
         assert_eq!(config.connection_timeouts.join_timeouts.get("world2"), Some(&Duration::from_secs(60)));
 
         assert!(!config.rate_limit.enabled);
-        assert_eq!(config.rate_limit.packets_per_second, 3000);
-        assert_eq!(config.rate_limit.burst_capacity, 1000);
+        assert_eq!(config.rate_limit.refill_rate, 3000);
+        assert_eq!(config.rate_limit.max_tokens, 1000);
 
         assert!(config.modules.contains_key("combat"));
         assert!(config.modules.get("combat").unwrap().enabled);
@@ -273,8 +273,8 @@ mod tests {
             },
             rate_limit: RateLimit {
                 enabled: false,
-                packets_per_second: 1500,
-                burst_capacity: 300,
+                refill_rate: 1500,
+                max_tokens: 300,
             },
             modules: HashMap::default(),
             log_levels: HashMap::default(),
