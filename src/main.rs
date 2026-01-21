@@ -1,4 +1,5 @@
 #![deny(clippy::disallowed_types)]
+#![allow(warnings)]
 
 use std::sync::LazyLock;
 use log::info;
@@ -8,7 +9,7 @@ use crate::server::core::options;
 use crate::util::scheduler::scheduler::Scheduler;
 
 mod logger;
-mod server;
+pub mod server;
 mod event;
 mod util;
 mod plugin;

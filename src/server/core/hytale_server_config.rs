@@ -24,7 +24,7 @@ pub struct HytaleServerConfig {
     pub max_view_radius: u32,
     pub defaults: Defaults,
     pub connection_timeouts: ConnectionTimeouts,
-    pub rate_limit: RateLimit,
+    pub rate_limit: RateLimitConfig,
     pub modules: HashMap<String, Module>,
     pub log_levels: HashMap<LogLevel, String>,
     pub mods: HashMap<PluginIdentifier, ModConfig>,
@@ -45,7 +45,7 @@ impl Default for HytaleServerConfig {
             max_view_radius: DEFAULT_MAX_VIEW_RADIUS,
             defaults: Defaults::default(),
             connection_timeouts: ConnectionTimeouts::default(),
-            rate_limit: RateLimit::default(),
+            rate_limit: RateLimitConfig::default(),
             modules: HashMap::default(),
             log_levels: HashMap::default(),
             mods: HashMap::default(),
@@ -114,20 +114,20 @@ impl Default for ConnectionTimeouts {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase", default)]
-pub struct RateLimit {
+pub struct RateLimitConfig {
     pub enabled: bool,
     pub refill_rate: u32,
     pub max_tokens: u32
 }
 
-impl RateLimit {
+impl RateLimitConfig {
     const DEFAULT_REFILL_RATE: u32 = 2000;
     const DEFAULT_MAX_TOKENS: u32 = 500;
 }
 
-impl Default for RateLimit {
+impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -271,7 +271,7 @@ mod tests {
                     map
                 },
             },
-            rate_limit: RateLimit {
+            rate_limit: RateLimitConfig {
                 enabled: false,
                 refill_rate: 1500,
                 max_tokens: 300,

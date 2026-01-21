@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "anyhow",
+ "async-trait",
  "chrono",
  "clap",
  "colored",
@@ -19,13 +20,16 @@ dependencies = [
  "log",
  "once_cell",
  "parking_lot",
+ "proc-macro2",
  "quinn",
+ "quote",
  "rayon",
  "rcgen",
  "rustls",
  "semver",
  "serde",
  "serde_json",
+ "syn",
  "tokio",
  "uuid",
 ]
@@ -165,6 +169,17 @@ name = "asn1-rs-impl"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b18050c2cd6fe86c3a76584ef5e0baf286d038cda203eb6223df2cc413565f7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "async-trait"
+version = "0.1.89"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1655,6 +1670,7 @@ version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
+ "getrandom 0.3.4",
  "js-sys",
  "wasm-bindgen",
 ]

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use log::{error, info};
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use quinn::{congestion, Connecting, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use quinn::crypto::rustls::QuicServerConfig;
 use rcgen::Certificate;
@@ -12,13 +13,18 @@ use rustls::client::danger::HandshakeSignatureValid;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, UnixTime};
 use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
 use tokio::time::timeout;
+use uuid::Uuid;
 use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
+use crate::server::core::network::connection_manager::{Connection, ConnectionContext};
+use crate::server::core::network::handlers::initial_handler::InitialPacketHandler;
+use crate::server::core::network::packet::packet_codec::CodecError;
 use crate::server::core::network::rate_limiter::RateLimiter;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
 const PORT: &str = "5520";
+const MAX_PACKET_SIZE: usize = 262_144; // 256 KB
+const PACKET_BUFFER_CAPACITY: usize = 1024 * 1024; // 1 MB buffer
 
-#[derive(Debug)]
 pub struct ServerNetworkManager {
     pub endpoint: Endpoint,
 }
@@ -34,10 +40,12 @@ impl ServerNetworkManager {
         let endpoint = Endpoint::server(server_config, addr)?;
         let manager = ServerNetworkManager { endpoint };
 
-        SERVER_NETWORK_MANAGER.set(manager).expect("Server Network Manager is already initialized");
+        if let Err(_) = SERVER_NETWORK_MANAGER.set(manager) {
+            panic!("Server Network Manager already initialized")
+        }
 
         tokio::spawn(run_accept_loop());
-        info!("Server is listening...");
+        info!("Server is listening on port {PORT}");
 
         Ok(())
     }
@@ -48,6 +56,7 @@ async fn run_accept_loop() {
 
     loop {
         let Some(incoming) = endpoint.accept().await else {
+            // Shutdown
             error!("Endpoint closed!");
             break
         };
@@ -73,22 +82,34 @@ async fn handle_connection(connecting: Connecting) {
         }
     };
 
-    info!("Connection from {}", connection.remote_address());
+    let remote_addr = connection.remote_address();
+    let connection_id = Uuid::new_v4().to_string();
 
-    // Verify client certificate
-    let identity = connection.peer_identity();
-    let client_certs = identity.and_then(|id| id.downcast::<Vec<CertificateDer<'static>>>().ok());
-    if client_certs.is_none() {
-        info!("Rejected: no client certificate");
-        // connection.close(0u32.into(), b"Missing client certificate");
-        // return;
-    }
+    info!("New connection from {}: {}", remote_addr, connection_id);
+
+    let rate_limiter = Arc::new(Mutex::new({
+        let config = HYTALE_SERVER.config.lock();
+        RateLimiter::new(
+            config.rate_limit.max_tokens,
+            config.rate_limit.refill_rate,
+        )
+    }));
 
     // Accept streams
     loop {
         match connection.accept_bi().await {
             Ok((send, recv)) => {
-                tokio::spawn(handle_stream(send, recv));
+                let initial_packet_handler = Box::new(InitialPacketHandler {});
+                let conn = Connection {
+                    id: connection_id.clone(),
+                    address: remote_addr,
+                    rate_limiter: rate_limiter.clone(),
+                    handler: initial_packet_handler,
+                    context: ConnectionContext {
+                        writer: Arc::new(Mutex::new(send))
+                    }
+                };
+                tokio::spawn(conn.run(recv));
             }
             Err(e) => {
                 error!("Stream accept error: {e}");
@@ -96,49 +117,6 @@ async fn handle_connection(connecting: Connecting) {
             }
         }
     }
-}
-
-async fn handle_stream(mut send: SendStream, mut recv: RecvStream) {
-    let mut buf = vec![0u8; 64 * 1024]; // 64 KB
-    let (mut rate_limiter, read_timeout) = {
-        let config = HYTALE_SERVER.config.lock();
-        let rate_limiter_config = &config.rate_limit;
-        let max_tokens = rate_limiter_config.max_tokens;
-        let refill_tokens = rate_limiter_config.refill_rate;
-        (RateLimiter::new(max_tokens, refill_tokens), config.connection_timeouts.initial_timeout)
-    };
-
-    loop {
-        let n = match timeout(read_timeout, recv.read(&mut buf)).await {
-            Ok(Ok(Some(n))) => n,
-            Ok(Ok(None)) => {
-                info!("Stream closed by client");
-                break;
-            }
-            Ok(Err(e)) => {
-                info!("Read error: {e}");
-                break;
-            }
-            Err(_) => {
-                info!("Timeout waiting for packet");
-                break;
-            }
-        };
-
-        if !rate_limiter.consume() {
-            info!("Rate limit exceeded, disconnecting stream");
-            break;
-        }
-
-        let packet_bytes = &buf[..n];
-        info!("Received packet ({} bytes): {:?}", n, packet_bytes);
-
-        // TODO: packetDecoder, packetHandler, packetEncoder will go here later
-    }
-
-    // Stream closed
-    let _ = send.finish();
-    info!("Stream handler finished");
 }
 
 fn build_server_config(cert_chain: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> anyhow::Result<ServerConfig> {
