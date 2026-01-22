@@ -18,6 +18,7 @@ dependencies = [
  "fern",
  "futures",
  "log",
+ "memchr",
  "once_cell",
  "parking_lot",
  "proc-macro2",

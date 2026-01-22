@@ -38,86 +38,96 @@ impl From<CodecError> for Error {
 pub struct PacketCodec;
 
 impl PacketCodec {
-    pub fn encode_packet(packet: &impl Packet) -> Result<Vec<u8>, CodecError> {
-        let mut body_buf = Vec::with_capacity(256);
+    /// Frame format: [payload_len: u32 LE][packet_id: u32 LE][body...]
+    /// payload_len = len(body) only, NOT including packet_id
+    pub fn encode(packet: &impl Packet) -> Result<Vec<u8>, CodecError> {
+        let mut body_buf = Vec::with_capacity(512);
 
-        // Encode body first
+        // Encode packet body
         packet.encode(&mut body_buf)
-            .map_err(|e| CodecError::Encode(e.to_string()))?;
+            .map_err(|e| CodecError::Encode(format!("Failed to encode packet: {}", e)))?;
 
         let packet_id = packet.packet_id();
-        let payload_len = 4 + body_buf.len(); // ID (4 bytes) + body length
+        let payload_len = body_buf.len();
 
+        // Validate size
         if payload_len > MAX_PACKET_SIZE {
             return Err(CodecError::TooLarge(format!(
-                "Encoded packet size {} exceeds limit {}",
+                "Packet payload {} exceeds max size {}",
                 payload_len, MAX_PACKET_SIZE
             )));
         }
 
-        // Build final packet: [length][ID][body]
-        let mut out = Vec::with_capacity(4 + payload_len);
-        out.write_all(&(payload_len as u32).to_le_bytes())
-            .map_err(|e| CodecError::Encode(e.to_string()))?;
-        out.write_all(&packet_id.to_le_bytes())
-            .map_err(|e| CodecError::Encode(e.to_string()))?;
+        // Build frame: [payload_len: u32 LE][packet_id: u32 LE][body]
+        let mut out = Vec::with_capacity(8 + payload_len);
+        out.extend_from_slice(&(payload_len as u32).to_le_bytes());
+        out.extend_from_slice(&packet_id.to_le_bytes());
         out.extend_from_slice(&body_buf);
 
         Ok(out)
     }
 
-    pub async fn read_framed_packet(recv: &mut RecvStream) -> Result<Vec<u8>, CodecError> {
-        // Read 4-byte little-endian length prefix
-        let mut len_buf = [0u8; 4];
-        recv.read_exact(&mut len_buf).await
-            .map_err(|e| CodecError::Decode(format!("Failed to read length: {}", e)))?;
+    /// Read framed packet from stream
+    /// Returns: (packet_id, body_bytes)
+    pub async fn read_framed_packet(recv: &mut RecvStream) -> Result<(u32, Vec<u8>), CodecError> {
+        // Read header: [payload_len: u32 LE][packet_id: u32 LE]
+        let mut header = [0u8; 8];
+        recv.read_exact(&mut header).await
+            .map_err(|e| CodecError::Decode(format!("Failed to read packet header: {}", e)))?;
 
-        let packet_len = u32::from_le_bytes(len_buf) as usize;
-        
-        if packet_len == 0 {
-            return Err(CodecError::Decode("Empty packet".into()));
+        eprintln!("=== read_framed_packet ===");
+        eprintln!("Raw header bytes: {:02X?}", header);
+
+        let payload_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
+        let packet_id = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
+
+        eprintln!("Decoded payload_len: {}", payload_len);
+        eprintln!("Decoded packet_id: 0x{:02X}", packet_id);
+
+        // Validate payload length
+        if payload_len == 0 {
+            return Err(CodecError::Decode("Empty packet payload".into()));
         }
-
-        if packet_len > MAX_PACKET_SIZE {
+        if payload_len > MAX_PACKET_SIZE {
             return Err(CodecError::TooLarge(format!(
-                "Packet size {} exceeds limit {}",
-                packet_len, MAX_PACKET_SIZE
+                "Packet payload {} exceeds max size {}",
+                payload_len, MAX_PACKET_SIZE
             )));
         }
 
-        let mut payload = vec![0u8; packet_len];
+        // Read payload (body only, packet_id already extracted)
+        let mut payload = vec![0u8; payload_len];
         recv.read_exact(&mut payload).await
-            .map_err(|e| CodecError::Decode(format!("Failed to read payload: {}", e)))?;
+            .map_err(|e| CodecError::Decode(format!("Failed to read packet payload: {}", e)))?;
 
-        Ok(payload)
+        eprintln!("Read {} bytes of payload", payload.len());
+        eprintln!("First 32 bytes of payload: {:02X?}",
+                  &payload[..std::cmp::min(32, payload.len())]);
+
+        Ok((packet_id, payload))
     }
 
-    /// Decodes packet from payload (expects [ID (VarInt)][Body])
-    #[inline]
-    pub fn decode_as<P: Packet>(data: &[u8]) -> Result<P, CodecError> {
-        let mut cursor = Cursor::new(data);
-
-        let packet = P::decode(&mut cursor)?;
-
-        // Verify all data was consumed
-        let pos = cursor.position() as usize;
-        if pos != data.len() {
-            return Err(CodecError::Decode(format!(
-                "Extra bytes after packet: read {} of {} bytes",
-                pos, data.len()
-            )));
+    /// Decode packet from raw bytes [packet_id: u32 LE][body...]
+    pub fn decode<P: Packet>(data: &[u8]) -> Result<P, CodecError> {
+        if data.len() < 4 {
+            return Err(CodecError::Decode("Packet too short to contain ID".into()));
         }
 
-        Ok(packet)
+        let _packet_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let body = &data[4..];
+
+        let mut cursor = Cursor::new(body);
+        // P::decode(&mut cursor)
+        Err(CodecError::Decode("e".to_owned()))
     }
 }
 
-pub trait CodecField: Sized {
+pub trait PacketField: Sized {
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()>;
     fn decode(reader: &mut dyn Read) -> Result<Self, CodecError>;
 }
 
-impl CodecField for u8 {
+impl PacketField for u8 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&[*self])
@@ -132,7 +142,7 @@ impl CodecField for u8 {
     }
 }
 
-impl CodecField for u16 {
+impl PacketField for u16 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -147,7 +157,7 @@ impl CodecField for u16 {
     }
 }
 
-impl CodecField for u32 {
+impl PacketField for u32 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -162,7 +172,7 @@ impl CodecField for u32 {
     }
 }
 
-impl CodecField for u64 {
+impl PacketField for u64 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -177,7 +187,7 @@ impl CodecField for u64 {
     }
 }
 
-impl CodecField for u128 {
+impl PacketField for u128 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -192,7 +202,7 @@ impl CodecField for u128 {
     }
 }
 
-impl CodecField for i8 {
+impl PacketField for i8 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&[*self as u8])
@@ -207,7 +217,7 @@ impl CodecField for i8 {
     }
 }
 
-impl CodecField for i16 {
+impl PacketField for i16 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -223,7 +233,7 @@ impl CodecField for i16 {
 }
 
 
-impl CodecField for i32 {
+impl PacketField for i32 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -238,7 +248,7 @@ impl CodecField for i32 {
     }
 }
 
-impl CodecField for i64 {
+impl PacketField for i64 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -253,7 +263,7 @@ impl CodecField for i64 {
     }
 }
 
-impl CodecField for i128 {
+impl PacketField for i128 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -268,7 +278,7 @@ impl CodecField for i128 {
     }
 }
 
-impl CodecField for f32 {
+impl PacketField for f32 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -283,7 +293,7 @@ impl CodecField for f32 {
     }
 }
 
-impl CodecField for f64 {
+impl PacketField for f64 {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&self.to_le_bytes())
@@ -298,7 +308,7 @@ impl CodecField for f64 {
     }
 }
 
-impl CodecField for bool {
+impl PacketField for bool {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&[*self as u8])
@@ -313,7 +323,7 @@ impl CodecField for bool {
     }
 }
 
-impl CodecField for String {
+impl PacketField for String {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         let bytes = self.as_bytes();
@@ -330,7 +340,10 @@ impl CodecField for String {
 
         let len = u32::from_le_bytes(len_buf) as usize;
 
-        // Prevent DoS: validate string length
+        eprintln!("String::decode");
+        eprintln!("  len_buf: {:02X?}", len_buf);
+        eprintln!("  decoded len: {}", len);
+
         if len > MAX_STRING_LENGTH {
             return Err(CodecError::TooLarge(format!(
                 "String too long: {} bytes (max: {})",
@@ -342,12 +355,14 @@ impl CodecField for String {
         reader.read_exact(&mut bytes)
             .map_err(|e| CodecError::Decode(format!("Failed to read string data: {}", e)))?;
 
+        eprintln!("  ✅ Read {} bytes", bytes.len());
+
         String::from_utf8(bytes)
             .map_err(|e| CodecError::Utf8(format!("Invalid UTF-8 in string: {}", e)))
     }
 }
 
-impl<T: CodecField> CodecField for Vec<T> {
+impl<T: PacketField> PacketField for Vec<T> {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         writer.write_all(&(self.len() as u32).to_le_bytes())?;
@@ -367,11 +382,11 @@ impl<T: CodecField> CodecField for Vec<T> {
 
         if len > MAX_PACKET_SIZE {
             return Err(CodecError::TooLarge(format!(
-                "Vec too long: {} items", len
+                "Array too long: {} items", len
             )));
         }
 
-        let mut items = Vec::with_capacity(len.min(4096));
+        let mut items = Vec::with_capacity(len);
         for _ in 0..len {
             items.push(T::decode(reader)?);
         }
@@ -379,7 +394,7 @@ impl<T: CodecField> CodecField for Vec<T> {
     }
 }
 
-impl<T: CodecField> CodecField for Option<T> {
+impl<T: PacketField> PacketField for Option<T> {
     #[inline]
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         match self {
