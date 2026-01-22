@@ -33,48 +33,41 @@ impl<'a> PacketDecoder<'a> {
     #[inline(always)]
     pub fn read_i16(&mut self, name: &'static str) -> Result<i16, CodecError> {
         let bytes = self.read_fixed_array(2, name)?;
-        let array: [u8; 2] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read i16 for {}", name)))?;
-        Ok(i16::from_le_bytes(array))
+        Ok(i16::from_le_bytes([bytes[0], bytes[1]]))
     }
 
     #[inline(always)]
     pub fn read_u32(&mut self, name: &'static str) -> Result<u32, CodecError> {
         let bytes = self.read_fixed_array(4, name)?;
-        let array: [u8; 4] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read u32 for {}", name)))?;
-        Ok(u32::from_le_bytes(array))
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     #[inline(always)]
     pub fn read_i32(&mut self, name: &'static str) -> Result<i32, CodecError> {
         let bytes = self.read_fixed_array(4, name)?;
-        let array: [u8; 4] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read i32 for {}", name)))?;
-        Ok(i32::from_le_bytes(array))
+        Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     #[inline(always)]
     pub fn read_f32(&mut self, name: &'static str) -> Result<f32, CodecError> {
         let bytes = self.read_fixed_array(4, name)?;
-        let array: [u8; 4] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read f32 for {}", name)))?;
-        Ok(f32::from_le_bytes(array))
+        Ok(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
     #[inline(always)]
     pub fn read_f64(&mut self, name: &'static str) -> Result<f64, CodecError> {
         let bytes = self.read_fixed_array(8, name)?;
-        let array: [u8; 8] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read f64 for {}", name)))?;
-        Ok(f64::from_le_bytes(array))
+        Ok(f64::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+        ]))
     }
 
     #[inline(always)]
     pub fn read_u128(&mut self, name: &'static str) -> Result<u128, CodecError> {
         let bytes = self.read_fixed_array(16, name)?;
-        let array: [u8; 16] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Failed to read u128 for {}", name)))?;
+        let mut array = [0u8; 16];
+        array.copy_from_slice(bytes);
         Ok(u128::from_le_bytes(array))
     }
 
@@ -103,8 +96,8 @@ impl<'a> PacketDecoder<'a> {
     #[inline(always)]
     pub fn read_uuid(&mut self, name: &'static str) -> Result<Uuid, CodecError> {
         let bytes = self.read_fixed_array(16, name)?;
-        let array: [u8; 16] = bytes.try_into()
-            .map_err(|_| CodecError::Decode(format!("Invalid UUID length for {}", name)))?;
+        let mut array = [0u8; 16];
+        array.copy_from_slice(bytes);
         Ok(Uuid::from_bytes(array))
     }
 
@@ -112,8 +105,8 @@ impl<'a> PacketDecoder<'a> {
     #[inline(always)]
     pub fn read_offsets<const N: usize>(&mut self, name: &'static str) -> Result<[i32; N], CodecError> {
         let mut offsets = [0i32; N];
-        for i in 0..N {
-            offsets[i] = self.read_i32(name)?;
+        for offset in &mut offsets {
+            *offset = self.read_i32(name)?;
         }
         Ok(offsets)
     }
@@ -121,30 +114,91 @@ impl<'a> PacketDecoder<'a> {
     /// Get variable string from offset - automatically handles None if offset < 0
     #[inline(always)]
     pub fn read_var_string(&self, offset: i32, name: &'static str) -> Result<String, CodecError> {
-        if offset < 0 {
-            return Err(CodecError::Decode(format!("offset is negative in {}", name)));
-        }
+        let offset = cast_offset(offset, name)?;
         let slice = self.read_var_field(offset, name)?;
         String::from_utf8(slice.to_vec())
             .map_err(|_| CodecError::Decode(format!("Invalid UTF-8 in {}", name)))
     }
 
+    /// Get variable bytes from offset - automatically handles None if offset < 0
     #[inline(always)]
-    pub fn read_var_i16(&self, offset: usize, name: &'static str) -> Result<i16, CodecError> {
+    pub fn read_var_bytes(&self, offset: i32, name: &'static str) -> Result<Vec<u8>, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        self.read_var_field(offset, name).map(|slice| slice.to_vec())
+    }
+
+    #[inline(always)]
+    pub fn read_var_u8(&self, offset: i32, name: &'static str) -> Result<u8, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset >= var.len() {
+            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+        }
+        Ok(var[offset])
+    }
+
+    #[inline(always)]
+    pub fn read_var_i16(&self, offset: i32, name: &'static str) -> Result<i16, CodecError> {
+        let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset + 2 > var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {}", name)));
+            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
         }
         Ok(i16::from_le_bytes([var[offset], var[offset + 1]]))
     }
 
-    /// Get variable bytes from offset - automatically handles None if offset < 0
     #[inline(always)]
-    pub fn read_var_bytes(&self, offset: i32, name: &'static str) -> Result<Vec<u8>, CodecError> {
-        if offset < 0 {
-            return Err(CodecError::Decode(format!("offset is negative in {}", name)));
+    pub fn read_var_u16(&self, offset: i32, name: &'static str) -> Result<u16, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset + 2 > var.len() {
+            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
         }
-        self.read_var_field(offset, name).map(|slice| slice.to_vec())
+        Ok(u16::from_le_bytes([var[offset], var[offset + 1]]))
+    }
+
+    #[inline(always)]
+    pub fn read_var_i32(&self, offset: i32, name: &'static str) -> Result<i32, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset + 4 > var.len() {
+            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+        }
+        Ok(i32::from_le_bytes([var[offset], var[offset + 1], var[offset + 2], var[offset + 3]]))
+    }
+
+    #[inline(always)]
+    pub fn read_var_u32(&self, offset: i32, name: &'static str) -> Result<u32, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset + 4 > var.len() {
+            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+        }
+        Ok(u32::from_le_bytes([var[offset], var[offset + 1], var[offset + 2], var[offset + 3]]))
+    }
+
+    #[inline(always)]
+    pub fn read_var_f32(&self, offset: i32, name: &'static str) -> Result<f32, CodecError> {
+        Ok(f32::from_le_bytes([
+            self.read_var_u8(offset, name)?,
+            self.read_var_u8(offset + 1, name)?,
+            self.read_var_u8(offset + 2, name)?,
+            self.read_var_u8(offset + 3, name)?,
+        ]))
+    }
+
+    #[inline(always)]
+    pub fn read_var_f64(&self, offset: i32, name: &'static str) -> Result<f64, CodecError> {
+        Ok(f64::from_le_bytes([
+            self.read_var_u8(offset, name)?,
+            self.read_var_u8(offset + 1, name)?,
+            self.read_var_u8(offset + 2, name)?,
+            self.read_var_u8(offset + 3, name)?,
+            self.read_var_u8(offset + 4, name)?,
+            self.read_var_u8(offset + 5, name)?,
+            self.read_var_u8(offset + 6, name)?,
+            self.read_var_u8(offset + 7, name)?,
+        ]))
     }
 
     /// Get remaining data as variable block
@@ -155,21 +209,20 @@ impl<'a> PacketDecoder<'a> {
 
     /// Get variable field slice
     #[inline(always)]
-    pub fn read_var_field(&self, offset: i32, name: &'static str) -> Result<&'a [u8], CodecError> {
-        if offset < 0 {
-            return Ok(&[]);
-        }
-
+    fn read_var_field(&self, offset: usize, name: &'static str) -> Result<&'a [u8], CodecError> {
         let var_block = self.var_block();
-        let start = offset as usize;
 
-        if start >= var_block.len() {
+        if offset >= var_block.len() {
             return Err(CodecError::Decode(format!("Offset out of bounds for {}", name)));
         }
 
-        let (len, data_pos) = read_varint_at(var_block, start)?;
-        let end = data_pos + len;
+        let (len, data_pos) = read_varint_at(var_block, offset)?;
 
+        if len > 32768 {
+            return Err(CodecError::Decode(format!("{} too long: {} > 32768", name, len)));
+        }
+
+        let end = data_pos + len;
         if end > var_block.len() {
             return Err(CodecError::Decode(format!("Field overflow for {}", name)));
         }
@@ -194,7 +247,15 @@ impl NullBits {
     }
 }
 
-#[inline]
+#[inline(always)]
+pub fn cast_offset(offset: i32, name: &'static str) -> Result<usize, CodecError> {
+    if offset < 0 {
+        return Err(CodecError::Decode(format!("Negative offset in {}", name)));
+    }
+    Ok(offset as usize)
+}
+
+#[inline(always)]
 fn read_varint_at(buf: &[u8], mut pos: usize) -> Result<(usize, usize), CodecError> {
     let mut value = 0usize;
     let mut shift = 0u32;
@@ -229,7 +290,7 @@ pub struct Connect {
     pub identity_token: Option<String>,
     pub username: String,
     pub referral_data: Option<Vec<u8>>,
-    pub referral_source: HostAddress
+    pub referral_source: Option<HostAddress>
 }
 
 impl Packet for Connect {
@@ -268,10 +329,13 @@ impl Packet for Connect {
 
         let referral_data = match nulls.is_set(2) {
             true => Some(dec.read_var_bytes(offsets[3], "referral_data")?),
-            false => None,
+            false => None
         };
 
-        let referral_source = HostAddress::decode(&mut dec, offsets[4])?;
+        let referral_source = match nulls.is_set(3) {
+            true => Some(HostAddress::decode(&mut dec, offsets[4])?),
+            false => None
+        };
 
         Ok(Self {
             protocol_hash,
@@ -294,12 +358,12 @@ pub struct HostAddress {
 
 impl PacketField for HostAddress {
     fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()> {
-        todo!()
+        unimplemented!()
     }
 
     fn decode(dec: &mut PacketDecoder, offset: i32) -> Result<Self, CodecError> {
-        let port = dec.read_var_i16(offset as usize, "port")?;
-        let host = dec.read_var_string(offset, "host")?;
+        let port = dec.read_var_i16(offset, "port")?;
+        let host = dec.read_var_string(offset + 2, "host")?;
         Ok(Self { host, port })
     }
 }
