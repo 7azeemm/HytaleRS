@@ -9,10 +9,11 @@ use crate::server::core::options;
 use crate::util::scheduler::scheduler::Scheduler;
 
 mod logger;
-pub mod server;
+mod server;
 mod event;
 mod util;
 mod plugin;
+mod protocol;
 
 pub static GLOBAL_SCHEDULER: LazyLock<Scheduler> = LazyLock::new(|| Scheduler::new());
 

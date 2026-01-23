@@ -5,7 +5,7 @@ use std::time::Duration;
 use log::{error, info};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use quinn::{congestion, Connecting, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
+use quinn::{congestion, Connecting, ConnectionError, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use quinn::crypto::rustls::QuicServerConfig;
 use rcgen::Certificate;
 use rustls::{DigitallySignedStruct, DistinguishedName, SignatureScheme};
@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
 use crate::server::core::network::connection_manager::{Connection, ConnectionContext};
 use crate::server::core::network::handlers::initial_handler::InitialPacketHandler;
-use crate::server::core::network::packet::packet_codec::CodecError;
+use crate::server::core::network::packet::packet_error::PacketError;
 use crate::server::core::network::rate_limiter::RateLimiter;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
@@ -106,15 +106,16 @@ async fn handle_connection(connecting: Connecting) {
                     rate_limiter: rate_limiter.clone(),
                     handler: initial_packet_handler,
                     context: ConnectionContext {
-                        writer: Arc::new(Mutex::new(send))
+                        writer: Arc::new(tokio::sync::Mutex::new(send))
                     }
                 };
                 tokio::spawn(conn.run(recv));
             }
-            Err(e) => {
-                error!("Stream accept error: {e}");
+            Err(e) if !matches!(ConnectionError::ConnectionClosed, _e) => {
+                error!("Stream Error: {}", e);
                 break;
             }
+            Err(_) => { /* Disconnect */ }
         }
     }
 }

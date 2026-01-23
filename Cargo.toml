@@ -14,9 +14,6 @@ name = "HytaleRS"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-proc-macro = true
-
 [dependencies]
 tokio = { version = "1.49.0", features = ["fs", "time", "rt", "rt-multi-thread", "macros"] }
 log = "0.4.29"
@@ -45,3 +42,6 @@ syn = "2.0.114"
 proc-macro2 = "1.0.105"
 async-trait = "0.1.89"
 memchr = "2.7.6"
+num_enum = "0.7.5"
+strum = "0.27.2"
+strum_macros = "0.27.2"

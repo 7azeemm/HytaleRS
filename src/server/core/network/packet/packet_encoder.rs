@@ -1,0 +1,472 @@
+use log::{error, info};
+use tokio::time::Instant;
+use crate::server::core::network::packet::packet::{Packet, PacketField};
+use crate::server::core::network::packet::packet_error::{PacketError};
+use uuid::Uuid;
+use crate::server::core::network::connection_manager::MAX_PACKET_SIZE;
+
+pub struct PacketEncoder<'a> {
+    buf: &'a mut Vec<u8>,
+}
+
+impl<'a> PacketEncoder<'a> {
+    #[inline]
+    pub fn encode<P: Packet>(packet: &P) -> Option<Vec<u8>> {
+        let start_time = Instant::now();
+        let mut body_buf = Vec::with_capacity(512);
+
+        if let Err(err) = packet.encode(&mut body_buf) {
+            error!("Failed to encode packet 0x{:02X}: {}", P::packet_id(), err);
+            return None
+        }
+
+        let packet_id = P::packet_id();
+        let payload_len = body_buf.len();
+
+        if payload_len > MAX_PACKET_SIZE {
+            error!("Packet payload {} exceeds max size {}", payload_len, MAX_PACKET_SIZE);
+            return None
+        }
+
+        let mut out = Vec::with_capacity(8 + payload_len);
+        out.extend_from_slice(&(payload_len as u32).to_le_bytes());
+        out.extend_from_slice(&packet_id.to_le_bytes());
+        out.extend_from_slice(&body_buf);
+
+        let end_time = start_time.elapsed();
+        info!("Encoded Packet 0x{:02X} in {:?}", packet_id, end_time);
+
+        Some(out)
+    }
+
+    #[inline]
+    pub fn new(buf: &'a mut Vec<u8>) -> Self {
+        Self { buf }
+    }
+
+    #[inline]
+    pub fn write_null_bits(&mut self, nulls: u8) {
+        self.write_u8(nulls);
+    }
+
+    #[inline]
+    pub fn write_u8(&mut self, val: u8) {
+        self.buf.push(val);
+    }
+
+    #[inline]
+    pub fn write_i16(&mut self, val: i16) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_u32(&mut self, val: u32) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_i32(&mut self, val: i32) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_f32(&mut self, val: f32) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_f64(&mut self, val: f64) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_u128(&mut self, val: u128) {
+        self.buf.extend_from_slice(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_fixed_array(&mut self, data: &[u8]) {
+        self.buf.extend_from_slice(data);
+    }
+
+    #[inline]
+    pub fn write_fixed_string(&mut self, s: &str, len: usize) {
+        let s_bytes = s.as_bytes();
+        let copy_len = s_bytes.len().min(len);
+        self.buf.extend_from_slice(&s_bytes[..copy_len]);
+        if copy_len < len {
+            self.buf.resize(self.buf.len() + (len - copy_len), 0);
+        }
+    }
+
+    #[inline]
+    pub fn write_uuid(&mut self, uuid: Uuid) {
+        self.buf.extend_from_slice(uuid.as_bytes());
+    }
+
+    #[inline]
+    pub fn pos(&self) -> i32 {
+        self.buf.len() as i32
+    }
+
+    #[inline]
+    pub fn reserve_offsets<'s, const N: usize>(&'s mut self) -> Result<OffsetReserver<'s, 'a, N>, PacketError> {
+        let pos = self.pos();
+        self.buf.resize(self.buf.len() + N * 4, 0);
+        Ok(OffsetReserver {
+            encoder: self,
+            pos,
+            offsets: [0i32; N],
+            count: 0,
+        })
+    }
+
+    #[inline]
+    pub fn write_var_string(&mut self, s: &str) {
+        write_varint(self.buf, s.len());
+        self.buf.extend_from_slice(s.as_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_bytes(&mut self, data: &[u8]) {
+        write_varint(&mut self.buf, data.len());
+        self.buf.extend_from_slice(data);
+    }
+
+    #[inline]
+    fn write_var_primitive(&mut self, bytes: &[u8]) {
+        self.buf.extend_from_slice(bytes);
+    }
+
+    #[inline]
+    pub fn write_var_i8(&mut self, val: i8) {
+        self.buf.push(val as u8);
+    }
+
+    #[inline]
+    pub fn write_var_u8(&mut self, val: u8) {
+        self.buf.push(val);
+    }
+
+    #[inline]
+    pub fn write_var_i16(&mut self, val: i16) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_u16(&mut self, val: u16) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_i32(&mut self, val: i32) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_u32(&mut self, val: u32) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_i64(&mut self, val: i64) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_u64(&mut self, val: u64) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_f32(&mut self, val: f32) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_var_f64(&mut self, val: f64) {
+        self.write_var_primitive(&val.to_le_bytes());
+    }
+
+    #[inline]
+    pub fn write_opt_string(&mut self, val: Option<&str>) {
+        if let Some(s) = val {
+            self.write_var_string(s);
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_bytes(&mut self, val: Option<&[u8]>) {
+        if let Some(data) = val {
+            self.write_var_bytes(data);
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_i8(&mut self, val: Option<i8>) {
+        if let Some(v) = val {
+            self.buf.push(v as u8);
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_u8(&mut self, val: Option<u8>) {
+        if let Some(v) = val {
+            self.buf.push(v);
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_i16(&mut self, val: Option<i16>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_u16(&mut self, val: Option<u16>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_i32(&mut self, val: Option<i32>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_u32(&mut self, val: Option<u32>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_i64(&mut self, val: Option<i64>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_u64(&mut self, val: Option<u64>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_f32(&mut self, val: Option<f32>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn write_opt_f64(&mut self, val: Option<f64>) {
+        if let Some(v) = val {
+            self.write_var_primitive(&v.to_le_bytes());
+        }
+    }
+}
+
+/// Helper for writing variable field offsets
+pub struct OffsetReserver<'a, 'b, const N: usize> {
+    encoder: &'a mut PacketEncoder<'b>,
+    pos: i32,                  // Position where offsets start
+    offsets: [i32; N],         // Offset values to write back
+    count: usize,              // How many offsets have been recorded
+}
+
+impl<'a, 'b, const N: usize> OffsetReserver<'a, 'b, N> {
+    /// Record offset before writing a variable field
+    #[inline]
+    fn record_offset(&mut self) -> Result<i32, PacketError> {
+        if self.count >= N {
+            return Err(PacketError::Encode(format!("Too many offsets recorded: {} >= {}", self.count, N)));
+        }
+        let offset = self.encoder.pos() - (self.pos + (N as i32 * 4));
+        self.offsets[self.count] = offset;
+        self.count += 1;
+        Ok(offset)
+    }
+
+    /// Record a -1 offset for a None field
+    #[inline]
+    fn record_none(&mut self) -> Result<(), PacketError> {
+        if self.count >= N {
+            return Err(PacketError::Encode(format!("Too many offsets recorded: {} >= {}", self.count, N)));
+        }
+        self.offsets[self.count] = -1i32;
+        self.count += 1;
+        Ok(())
+    }
+
+    /// Write optional string
+    #[inline]
+    pub fn write_opt_string(&mut self, val: Option<&str>) -> Result<(), PacketError> {
+        match val {
+            Some(s) => {
+                self.record_offset()?;
+                self.encoder.write_var_string(s);
+                Ok(())
+            }
+            None => self.record_none(),
+        }
+    }
+
+    /// Write optional bytes
+    #[inline]
+    pub fn write_opt_bytes(&mut self, val: Option<&[u8]>) -> Result<(), PacketError> {
+        match val {
+            Some(data) => {
+                self.record_offset()?;
+                self.encoder.write_var_bytes(data);
+                Ok(())
+            }
+            None => self.record_none(),
+        }
+    }
+
+    /// Write required string with automatic offset tracking
+    #[inline]
+    pub fn write_string(&mut self, val: &str) -> Result<(), PacketError> {
+        self.record_offset()?;
+        self.encoder.write_var_string(val);
+        Ok(())
+    }
+
+    /// Write required bytes with automatic offset tracking
+    #[inline]
+    pub fn write_bytes(&mut self, val: &[u8]) -> Result<(), PacketError> {
+        self.record_offset()?;
+        self.encoder.write_var_bytes(val);
+        Ok(())
+    }
+
+    #[inline]
+    fn write_opt_primitive<F>(&mut self, val: Option<F>, write_fn: impl FnOnce(&mut PacketEncoder, F)) -> Result<(), PacketError> {
+        match val {
+            Some(v) => {
+                self.record_offset()?;
+                write_fn(self.encoder, v);
+                Ok(())
+            }
+            None => self.record_none(),
+        }
+    }
+
+    /// Write optional i8
+    #[inline]
+    pub fn write_opt_i8(&mut self, val: Option<i8>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_i8(v))
+    }
+
+    /// Write optional u8
+    #[inline]
+    pub fn write_opt_u8(&mut self, val: Option<u8>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_u8(v))
+    }
+
+    /// Write optional i16
+    #[inline]
+    pub fn write_opt_i16(&mut self, val: Option<i16>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_i16(v))
+    }
+
+    /// Write optional u16
+    #[inline]
+    pub fn write_opt_u16(&mut self, val: Option<u16>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_u16(v))
+    }
+
+    /// Write optional i32
+    #[inline]
+    pub fn write_opt_i32(&mut self, val: Option<i32>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_i32(v))
+    }
+
+    /// Write optional u32
+    #[inline]
+    pub fn write_opt_u32(&mut self, val: Option<u32>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_u32(v))
+    }
+
+    /// Write optional i64
+    #[inline]
+    pub fn write_opt_i64(&mut self, val: Option<i64>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_i64(v))
+    }
+
+    /// Write optional u64
+    #[inline]
+    pub fn write_opt_u64(&mut self, val: Option<u64>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_u64(v))
+    }
+
+    /// Write optional f32
+    #[inline]
+    pub fn write_opt_f32(&mut self, val: Option<f32>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_f32(v))
+    }
+
+    /// Write optional f64
+    #[inline]
+    pub fn write_opt_f64(&mut self, val: Option<f64>) -> Result<(), PacketError> {
+        self.write_opt_primitive(val, |enc, v| enc.write_var_f64(v))
+    }
+
+    /// Write optional custom type
+    #[inline]
+    pub fn write_opt_field<T: PacketField>(&mut self, val: Option<&T>) -> Result<(), PacketError> {
+        match val {
+            Some(v) => {
+                self.record_offset()?;
+                v.encode(&mut self.encoder.buf)
+                    .map_err(|e| PacketError::Encode(format!("Failed to encode field: {}", e)))
+            }
+            None => self.record_none(),
+        }
+    }
+
+    /// Write required custom type
+    #[inline]
+    pub fn write_field<T: PacketField>(&mut self, val: &T) -> Result<(), PacketError> {
+        self.record_offset()?;
+        val.encode(&mut self.encoder.buf)
+            .map_err(|e| PacketError::Encode(format!("Failed to encode field: {}", e)))
+    }
+
+    /// Finish and write offsets back to buffer
+    pub fn finish(self) -> Result<(), PacketError> {
+        if self.count != N {
+            return Err(PacketError::Encode(format!("Offset count mismatch: recorded {} but expected {}", self.count, N)));
+        }
+        // Patch the offsets at the reserved position
+        let mut patch_pos = self.pos as usize;
+        for i in 0..self.count {
+            let bytes = self.offsets[i].to_le_bytes();
+            self.encoder.buf[patch_pos..patch_pos + 4].copy_from_slice(&bytes);
+            patch_pos += 4;
+        }
+        Ok(())
+    }
+}
+
+#[inline]
+fn write_varint(buf: &mut Vec<u8>, mut value: usize) {
+    loop {
+        let mut byte = (value & 0x7F) as u8;
+        value >>= 7;
+        if value != 0 {
+            byte |= 0x80;
+        }
+        buf.push(byte);
+        if value == 0 {
+            break;
+        }
+    }
+}
