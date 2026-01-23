@@ -75,14 +75,8 @@ impl PacketCodec {
         recv.read_exact(&mut header).await
             .map_err(|e| CodecError::Decode(format!("Failed to read packet header: {}", e)))?;
 
-        eprintln!("=== read_framed_packet ===");
-        eprintln!("Raw header bytes: {:02X?}", header);
-
         let payload_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
         let packet_id = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
-
-        eprintln!("Decoded payload_len: {}", payload_len);
-        eprintln!("Decoded packet_id: 0x{:02X}", packet_id);
 
         // Validate payload length
         if payload_len == 0 {
@@ -99,10 +93,6 @@ impl PacketCodec {
         let mut payload = vec![0u8; payload_len];
         recv.read_exact(&mut payload).await
             .map_err(|e| CodecError::Decode(format!("Failed to read packet payload: {}", e)))?;
-
-        eprintln!("Read {} bytes of payload", payload.len());
-        eprintln!("First 32 bytes of payload: {:02X?}",
-                  &payload[..std::cmp::min(32, payload.len())]);
 
         Ok((packet_id, payload))
     }
@@ -340,10 +330,6 @@ impl PacketField for String {
 
         let len = u32::from_le_bytes(len_buf) as usize;
 
-        eprintln!("String::decode");
-        eprintln!("  len_buf: {:02X?}", len_buf);
-        eprintln!("  decoded len: {}", len);
-
         if len > MAX_STRING_LENGTH {
             return Err(CodecError::TooLarge(format!(
                 "String too long: {} bytes (max: {})",
@@ -354,8 +340,6 @@ impl PacketField for String {
         let mut bytes = vec![0u8; len];
         reader.read_exact(&mut bytes)
             .map_err(|e| CodecError::Decode(format!("Failed to read string data: {}", e)))?;
-
-        eprintln!("  ✅ Read {} bytes", bytes.len());
 
         String::from_utf8(bytes)
             .map_err(|e| CodecError::Utf8(format!("Invalid UTF-8 in string: {}", e)))

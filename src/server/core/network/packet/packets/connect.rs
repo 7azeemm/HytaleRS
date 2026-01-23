@@ -1,7 +1,11 @@
-use std::io::Write;
-use crate::server::core::network::packet::packet_codec::CodecError;
 use crate::server::core::network::packet::packet::{Packet, PacketField};
+use crate::server::core::network::packet::packet_codec::CodecError;
+use std::borrow::Cow;
+use std::io::Write;
 use uuid::Uuid;
+
+// Constants for field limits
+const MAX_FIELD_LENGTH: usize = 32768;
 
 pub struct PacketDecoder<'a> {
     buf: &'a [u8],
@@ -66,17 +70,26 @@ impl<'a> PacketDecoder<'a> {
     #[inline(always)]
     pub fn read_u128(&mut self, name: &'static str) -> Result<u128, CodecError> {
         let bytes = self.read_fixed_array(16, name)?;
-        let mut array = [0u8; 16];
-        array.copy_from_slice(bytes);
-        Ok(u128::from_le_bytes(array))
+        Ok(u128::from_le_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15],
+        ]))
     }
 
     /// Read fixed-size byte array
     #[inline(always)]
     pub fn read_fixed_array(&mut self, len: usize, name: &'static str) -> Result<&'a [u8], CodecError> {
-        let end = self.pos + len;
+        let end = self.pos.checked_add(len)
+            .ok_or_else(|| CodecError::Decode(format!("Integer overflow while reading {}", name)))?;
         if end > self.buf.len() {
-            return Err(CodecError::Decode(format!("Not enough data to read {} (needs {} bytes, {} available)", name, len, self.buf.len() - self.pos)));
+            return Err(CodecError::Decode(format!(
+                "Not enough data to read {} (needs {} bytes, {} available)",
+                name,
+                len,
+                self.buf.len() - self.pos
+            )));
         }
         let slice = &self.buf[self.pos..end];
         self.pos = end;
@@ -89,7 +102,7 @@ impl<'a> PacketDecoder<'a> {
         let bytes = self.read_fixed_array(len, name)?;
         let end = memchr::memchr(0, bytes).unwrap_or(len);
         String::from_utf8(bytes[..end].to_vec())
-            .map_err(|_| CodecError::Decode(format!("Invalid UTF-8 in {}", name)))
+            .map_err(|e| CodecError::Utf8(format!("Invalid UTF-8 in {}: {}", name, e)))
     }
 
     /// Read UUID
@@ -117,7 +130,7 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let slice = self.read_var_field(offset, name)?;
         String::from_utf8(slice.to_vec())
-            .map_err(|_| CodecError::Decode(format!("Invalid UTF-8 in {}", name)))
+            .map_err(|e| CodecError::Utf8(format!("Invalid UTF-8 in {}: {}", name, e)))
     }
 
     /// Get variable bytes from offset - automatically handles None if offset < 0
@@ -132,7 +145,10 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset >= var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
         }
         Ok(var[offset])
     }
@@ -142,7 +158,10 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset + 2 > var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
         }
         Ok(i16::from_le_bytes([var[offset], var[offset + 1]]))
     }
@@ -152,7 +171,10 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset + 2 > var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
         }
         Ok(u16::from_le_bytes([var[offset], var[offset + 1]]))
     }
@@ -162,9 +184,17 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset + 4 > var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
         }
-        Ok(i32::from_le_bytes([var[offset], var[offset + 1], var[offset + 2], var[offset + 3]]))
+        Ok(i32::from_le_bytes([
+            var[offset],
+            var[offset + 1],
+            var[offset + 2],
+            var[offset + 3],
+        ]))
     }
 
     #[inline(always)]
@@ -172,32 +202,56 @@ impl<'a> PacketDecoder<'a> {
         let offset = cast_offset(offset, name)?;
         let var = self.var_block();
         if offset + 4 > var.len() {
-            return Err(CodecError::Decode(format!("EOF while reading {} at offset {}", name, offset)));
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
         }
-        Ok(u32::from_le_bytes([var[offset], var[offset + 1], var[offset + 2], var[offset + 3]]))
+        Ok(u32::from_le_bytes([
+            var[offset],
+            var[offset + 1],
+            var[offset + 2],
+            var[offset + 3],
+        ]))
     }
 
     #[inline(always)]
     pub fn read_var_f32(&self, offset: i32, name: &'static str) -> Result<f32, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset + 4 > var.len() {
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
+        }
         Ok(f32::from_le_bytes([
-            self.read_var_u8(offset, name)?,
-            self.read_var_u8(offset + 1, name)?,
-            self.read_var_u8(offset + 2, name)?,
-            self.read_var_u8(offset + 3, name)?,
+            var[offset],
+            var[offset + 1],
+            var[offset + 2],
+            var[offset + 3],
         ]))
     }
 
     #[inline(always)]
     pub fn read_var_f64(&self, offset: i32, name: &'static str) -> Result<f64, CodecError> {
+        let offset = cast_offset(offset, name)?;
+        let var = self.var_block();
+        if offset + 8 > var.len() {
+            return Err(CodecError::Decode(format!(
+                "EOF while reading {} at offset {}",
+                name, offset
+            )));
+        }
         Ok(f64::from_le_bytes([
-            self.read_var_u8(offset, name)?,
-            self.read_var_u8(offset + 1, name)?,
-            self.read_var_u8(offset + 2, name)?,
-            self.read_var_u8(offset + 3, name)?,
-            self.read_var_u8(offset + 4, name)?,
-            self.read_var_u8(offset + 5, name)?,
-            self.read_var_u8(offset + 6, name)?,
-            self.read_var_u8(offset + 7, name)?,
+            var[offset],
+            var[offset + 1],
+            var[offset + 2],
+            var[offset + 3],
+            var[offset + 4],
+            var[offset + 5],
+            var[offset + 6],
+            var[offset + 7],
         ]))
     }
 
@@ -213,13 +267,19 @@ impl<'a> PacketDecoder<'a> {
         let var_block = self.var_block();
 
         if offset >= var_block.len() {
-            return Err(CodecError::Decode(format!("Offset out of bounds for {}", name)));
+            return Err(CodecError::Decode(format!(
+                "Offset out of bounds for {}",
+                name
+            )));
         }
 
         let (len, data_pos) = read_varint_at(var_block, offset)?;
 
-        if len > 32768 {
-            return Err(CodecError::Decode(format!("{} too long: {} > 32768", name, len)));
+        if len > MAX_FIELD_LENGTH {
+            return Err(CodecError::Decode(format!(
+                "{} too long: {} > {}",
+                name, len, MAX_FIELD_LENGTH
+            )));
         }
 
         let end = data_pos + len;
@@ -252,6 +312,7 @@ pub fn cast_offset(offset: i32, name: &'static str) -> Result<usize, CodecError>
     if offset < 0 {
         return Err(CodecError::Decode(format!("Negative offset in {}", name)));
     }
+    // Safe conversion from i32 to usize
     Ok(offset as usize)
 }
 
