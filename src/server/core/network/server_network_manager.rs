@@ -22,8 +22,6 @@ use crate::server::core::network::rate_limiter::RateLimiter;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
 const PORT: &str = "5520";
-const MAX_PACKET_SIZE: usize = 262_144; // 256 KB
-const PACKET_BUFFER_CAPACITY: usize = 1024 * 1024; // 1 MB buffer
 
 pub struct ServerNetworkManager {
     pub endpoint: Endpoint,
@@ -44,32 +42,29 @@ impl ServerNetworkManager {
             panic!("Server Network Manager already initialized")
         }
 
-        tokio::spawn(run_accept_loop());
+        tokio::spawn(run_accept_loop(SERVER_NETWORK_MANAGER.get().unwrap()));
         info!("Server is listening on port {PORT}");
 
         Ok(())
     }
 }
 
-async fn run_accept_loop() {
-    let endpoint = &SERVER_NETWORK_MANAGER.get().unwrap().endpoint;
-
+async fn run_accept_loop(manager: &ServerNetworkManager) {
     loop {
-        let Some(incoming) = endpoint.accept().await else {
-            // Shutdown
-            error!("Endpoint closed!");
-            break
-        };
-
-        let connecting = match incoming.accept() {
-            Ok(c) => c,
-            Err(err) => {
-                error!("Failed to accept an incoming connection: {}", err);
-                continue
+        match manager.endpoint.accept().await {
+            Some(incoming) => match incoming.accept() {
+                Ok(connection) => tokio::spawn(handle_connection(connection)),
+                Err(err) => {
+                    error!("Failed to accept an incoming connection: {}", err);
+                    continue
+                }
+            },
+            None => {
+                // Shutdown
+                error!("Endpoint closed!");
+                break
             }
         };
-
-        tokio::spawn(handle_connection(connecting));
     }
 }
 
@@ -88,7 +83,7 @@ async fn handle_connection(connecting: Connecting) {
     info!("New connection from {}: {}", remote_addr, connection_id);
 
     let rate_limiter = Arc::new(Mutex::new({
-        let config = HYTALE_SERVER.config.lock();
+        let config = HYTALE_SERVER.config.read();
         RateLimiter::new(
             config.rate_limit.max_tokens,
             config.rate_limit.refill_rate,
@@ -144,7 +139,7 @@ fn build_transport_config() -> anyhow::Result<TransportConfig> {
     transport.receive_window(524_288u32.into());
     transport.stream_receive_window(131_072u32.into());
 
-    let play_timeout = HYTALE_SERVER.config.lock().connection_timeouts.play_timeout;
+    let play_timeout = HYTALE_SERVER.config.read().connection_timeouts.play_timeout;
     transport.max_idle_timeout(Some(play_timeout.try_into()?));
 
     transport.mtu_discovery_config(Some(quinn::MtuDiscoveryConfig::default()));

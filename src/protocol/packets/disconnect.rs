@@ -31,8 +31,9 @@ impl Packet for Disconnect {
         enc.write_u8(self.cause as u8);
 
         let mut offsets = enc.reserve_offsets::<1>()?;
-        offsets.write_opt_string(self.reason.as_deref())?;
+        offsets.write_opt_string(self.reason.as_deref(), "reason")?;
         offsets.finish()?;
+
         Ok(())
     }
 

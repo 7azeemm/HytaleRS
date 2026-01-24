@@ -98,6 +98,7 @@ pub struct ConnectionTimeouts {
 }
 
 impl ConnectionTimeouts {
+    // Play Timeout should always be the longest!
     const DEFAULT_INITIAL_TIMEOUT: Duration = Duration::from_secs(10);
     const DEFAULT_AUTH_TIMEOUT: Duration = Duration::from_secs(30);
     const DEFAULT_PLAY_TIMEOUT: Duration = Duration::from_secs(60);

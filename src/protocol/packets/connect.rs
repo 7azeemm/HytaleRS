@@ -69,7 +69,7 @@ impl Packet for Connect {
 }
 
 impl PacketField for HostAddress {
-    fn encode(&self, _writer: &mut dyn Write) -> std::io::Result<()> {
+    fn encode(&self, _writer: &mut dyn Write) -> Result<(), PacketError> {
         unimplemented!()
     }
 

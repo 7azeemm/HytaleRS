@@ -1,4 +1,6 @@
+use std::time::Duration;
 use crate::protocol::packets::connect::Connect;
+use crate::server::core::hytale_server::HYTALE_SERVER;
 use crate::server::core::network::connection_manager::{ConnectionContext};
 use crate::server::core::network::handlers::authentication_handler::AuthenticationPacketHandler;
 use crate::server::core::network::packet::packet::Packet;
@@ -20,5 +22,9 @@ impl PacketHandler for InitialPacketHandler {
             },
             _ => Err(format!("Unexpected packet 0x{:02X} in Handshake", packet_id)),
         }
+    }
+
+    fn timeout(&self) -> Duration {
+        HYTALE_SERVER.config.read().connection_timeouts.initial_timeout
     }
 }

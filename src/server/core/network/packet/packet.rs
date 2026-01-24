@@ -10,6 +10,6 @@ pub trait Packet: Send + Sync + Sized + Debug {
 }
 
 pub trait PacketField: Send + Sync + Sized + Debug {
-    fn encode(&self, writer: &mut dyn Write) -> std::io::Result<()>;
+    fn encode(&self, writer: &mut dyn Write) -> Result<(), PacketError>;
     fn decode(dec: &mut PacketDecoder, offset: i32) -> Result<Self, PacketError>;
 }

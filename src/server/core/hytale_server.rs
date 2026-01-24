@@ -4,7 +4,7 @@ use std::sync::{Arc, LazyLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use log::info;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use tokio::time::sleep;
 use crate::server::core::command::system::command_manager::CommandManager;
 use crate::server::core::hytale_server_config::HytaleServerConfig;
@@ -21,7 +21,7 @@ pub struct HytaleServer {
     pub event_bus: Mutex<EventBus>,
     pub plugin_manager: Mutex<PluginManager>,
     pub command_manager: Mutex<CommandManager>,
-    pub config: Mutex<HytaleServerConfig>,
+    pub config: RwLock<HytaleServerConfig>,
     boot_start: Instant,
 }
 
@@ -40,7 +40,7 @@ impl HytaleServer {
             event_bus: Mutex::new(EventBus{}),
             plugin_manager: Mutex::new(PluginManager{}),
             command_manager: Mutex::new(CommandManager{}),
-            config: Mutex::new(config),
+            config: RwLock::new(config),
             boot_start,
         }
     }
