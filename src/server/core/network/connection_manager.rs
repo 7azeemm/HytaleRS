@@ -2,38 +2,56 @@ use std::error::Error;
 use std::io::{Cursor, Read};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
+use tokio::time::timeout;
 use crate::protocol::packets::disconnect::{Disconnect, DisconnectCause};
+use crate::server::core::hytale_server::HYTALE_SERVER;
+use crate::server::core::hytale_server_config::ConnectionTimeouts;
 pub(crate) use crate::server::core::network::packet::MAX_PACKET_SIZE;
 use crate::server::core::network::packet::packet::Packet;
 use crate::server::core::network::packet::packet_error::{PacketError};
-use crate::server::core::network::packet::packet_decoder::PacketDecoder;
+use crate::server::core::network::packet::packet_decoder::{read_framed_packet, PacketDecoder};
 use crate::server::core::network::packet::packet_encoder::PacketEncoder;
 use crate::server::core::network::packet::packet_handler::{HandlerAction, PacketHandler};
 use crate::server::core::network::rate_limiter::RateLimiter;
+use crate::server::core::network::stage_timer::StageTimer;
 
 pub struct Connection {
     pub id: String,
     pub address: SocketAddr,
-    pub rate_limiter: Arc<Mutex<RateLimiter>>,
+    pub rate_limiter: RateLimiter,
     pub context: ConnectionContext,
     pub handler: Box<dyn PacketHandler>,
 }
 
 impl Connection {
     pub async fn run(mut self, mut recv: RecvStream) {
+        self.handler.register(&mut self.context).await;
+        
         loop {
+            if self.context.check_timeout().await { break }
+
             // Rate limiting
-            if !self.rate_limiter.lock().consume() {
+            if !self.rate_limiter.consume() {
                 warn!("Rate limit exceeded for {}", self.address);
                 continue;
             }
 
-            let handler_timeout = self.handler.timeout();
-            match tokio::time::timeout(handler_timeout, read_framed_packet(&mut recv)).await {
-                Ok(Ok((packet_id, body))) => {
+            let read_result = match self.context.read_timeout().await {
+                Some(duration) => {
+                    tokio::time::timeout(duration, read_framed_packet(&mut recv))
+                        .await
+                        .map_err(|_| PacketError::ConnectionLost)
+                        .and_then(|r| r)
+                }
+                None => read_framed_packet(&mut recv).await,
+            };
+
+            match read_result {
+                Ok((packet_id, body)) => {
                     // Handle disconnect packet
                     if packet_id == 0x01 {
                         let reason = match PacketDecoder::decode::<Disconnect>(&body) {
@@ -46,14 +64,15 @@ impl Connection {
                         break;
                     }
 
-                    debug!("Received Packet 0x{:02X} from {}", packet_id, self.address);
+                    info!("Received Packet 0x{:02X} from {}", packet_id, self.address);
 
                     // Handle packet
                     match self.handler.handle(packet_id, &body, &mut self.context).await {
                         Ok(HandlerAction::Continue) => {},
                         Ok(HandlerAction::Transition(new_handler)) => {
-                            info!("Transitioning state for {}", self.address);
+                            info!("Handler changed for {}", self.address);
                             self.handler = new_handler;
+                            self.handler.register(&mut self.context).await;
                         },
                         Ok(HandlerAction::Disconnect(reason)) => {
                             self.context.disconnect(&reason).await;
@@ -66,21 +85,21 @@ impl Connection {
                         }
                     }
                 }
-                Ok(Err(e)) => {
+                Err(e) => {
                     match e {
                         PacketError::ConnectionLost => info!("Connection closed: {}", self.address),
                         _ => error!("Read error: {} from {}", e, self.address)
                     }
                     break;
                 }
-                Err(_) => error!("Read timeout reached! continue reading...")
             }
         }
     }
 }
 
 pub struct ConnectionContext {
-    pub writer: Arc<tokio::sync::Mutex<SendStream>>,
+    pub writer: tokio::sync::Mutex<SendStream>,
+    pub timer: tokio::sync::Mutex<StageTimer>,
 }
 
 impl ConnectionContext {
@@ -104,43 +123,30 @@ impl ConnectionContext {
         self.close().await;
     }
 
+    pub async fn set_timeout(&self, timeout: Duration) {
+        info!("Timeout is set to {:?}", timeout);
+        *self.timer.lock().await = StageTimer::new(Some(timeout));
+    }
+
+    pub async fn clear_timeout(&self) {
+        info!("Timeout is cleared");
+        *self.timer.lock().await = StageTimer::new(None);
+    }
+
+    pub async fn read_timeout(&self) -> Option<Duration> {
+        self.timer.lock().await.remaining_time()
+    }
+
+    pub async fn check_timeout(&self) -> bool {
+        let timer = self.timer.lock().await;
+        if timer.is_timed_out() {
+            info!("Handler timeout after {:.2?}", timer.elapsed());
+            return true
+        }
+        false
+    }
+
     pub async fn close(&self) {
         let _ = self.writer.lock().await.finish();
-    }
-}
-
-/// Read framed packet from stream
-/// Returns: (packet_id, body_bytes)
-pub async fn read_framed_packet(recv: &mut RecvStream) -> Result<(u32, Vec<u8>), PacketError> {
-    let mut header = [0u8; 8];
-
-    recv.read_exact(&mut header).await.map_err(|err| map_read_error(err))?;
-
-    let payload_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
-    let packet_id = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
-
-    if payload_len <= 0 || payload_len > MAX_PACKET_SIZE {
-        return Err(PacketError::DecodeInvalidPayloadLength {
-            size: payload_len,
-            min: 0,
-            max: MAX_PACKET_SIZE
-        })
-    }
-    let payload_len = payload_len as usize;
-
-    let mut payload = vec![0u8; payload_len];
-    recv.read_exact(&mut payload).await.map_err(|err| map_read_error(err))?;
-
-    Ok((packet_id, payload))
-}
-
-#[inline]
-fn map_read_error(err: ReadExactError) -> PacketError {
-    match err {
-        ReadExactError::ReadError(read_err) => match read_err {
-            ReadError::ConnectionLost(_) | ReadError::ClosedStream => PacketError::ConnectionLost,
-            _ => PacketError::Error { reason: "Failed to read packet", error: read_err.to_string() },
-        },
-        _ => PacketError::Error { reason: "Failed to read packet", error: err.to_string() },
     }
 }

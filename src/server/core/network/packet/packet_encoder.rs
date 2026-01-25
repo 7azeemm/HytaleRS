@@ -4,7 +4,7 @@ use crate::server::core::network::packet::packet::{Packet, PacketField};
 use crate::server::core::network::packet::packet_error::{PacketError};
 use uuid::Uuid;
 use crate::server::core::network::connection_manager::MAX_PACKET_SIZE;
-use crate::server::core::network::packet::{MAX_STRING_LEN};
+use crate::server::core::network::packet::{MAX_STRING_LEN, MAX_VARINT};
 
 pub struct PacketEncoder<'a> {
     buf: &'a mut Vec<u8>,
@@ -378,9 +378,13 @@ impl<'a, 'b, const N: usize> OffsetReserver<'a, 'b, N> {
 
 #[inline]
 fn write_varint(buf: &mut Vec<u8>, mut value: usize) -> Result<(), PacketError> {
-    const MAX_VARINT: usize = (1 << 28) - 1;
     if value > MAX_VARINT {
         return Err(PacketError::EncodeOverflow { field: "varint" });
+    }
+
+    if value < 128 {
+        buf.push(value as u8);
+        return Ok(());
     }
 
     loop {

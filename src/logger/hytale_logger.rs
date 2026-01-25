@@ -28,7 +28,7 @@ impl AsyncLogger {
 
         // Set global logger
         log::set_boxed_logger(Box::new(AsyncLogger { sender: tx }))?;
-        log::set_max_level(log::LevelFilter::Trace);
+        log::set_max_level(log::LevelFilter::Info);
 
         Ok(())
     }

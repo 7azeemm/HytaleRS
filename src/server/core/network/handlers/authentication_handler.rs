@@ -10,10 +10,11 @@ pub struct AuthenticationPacketHandler {}
 impl PacketHandler for AuthenticationPacketHandler {
     async fn handle(&mut self, packet_id: u32, data: &[u8], cx: &mut ConnectionContext) -> Result<HandlerAction, String> {
         info!("Packet Received in AuthenticationHandler: {packet_id}");
+
         Err("Returned".to_owned())
     }
 
-    fn timeout(&self) -> Duration {
-        HYTALE_SERVER.config.read().connection_timeouts.auth_timeout
+    async fn register(&mut self, cx: &mut ConnectionContext) {
+        cx.set_timeout(HYTALE_SERVER.config.read().await.timeouts.auth).await;
     }
 }

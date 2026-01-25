@@ -7,12 +7,14 @@ use crate::server::core::network::packet::packet_decoder::PacketDecoder;
 
 #[derive(Debug)]
 pub struct Connect {
-    pub protocol_hash: String,
+    pub protocol_crc: i32,
+    pub protocol_build_number: i32,
+    pub client_version: String,
     pub client_type: ClientType,
     pub uuid: Uuid,
-    pub language: Option<String>,
-    pub identity_token: Option<String>,
     pub username: String,
+    pub identity_token: Option<String>,
+    pub language: String,
     pub referral_data: Option<Vec<u8>>,
     pub referral_source: Option<HostAddress>,
 }
@@ -43,25 +45,28 @@ impl Packet for Connect {
         let mut dec = PacketDecoder::new(&buf);
 
         let nulls = dec.read_null_bits()?;
-        let protocol_hash = dec.read_fixed_string(64, "protocol_hash")?;
+        let protocol_crc = dec.read_i32("protocol_crc")?;
+        let protocol_build_number = dec.read_i32("protocol_build_number")?;
+        let client_version = dec.read_fixed_string(20, "client_version")?;
         let client_type = ClientType::try_from(dec.read_u8("client_type")?)?;
         let uuid = dec.read_uuid("uuid")?;
 
         let offsets = dec.read_offsets::<5>()?;
-
-        let language = dec.read_opt_string(nulls, 0, offsets[0], "language")?;
-        let identity_token = dec.read_opt_string(nulls, 1, offsets[1], "identity_token")?;
-        let username = dec.read_var_string(offsets[2], "username")?;
-        let referral_data = dec.read_opt_bytes(nulls, 2, offsets[3], "referral_data")?;
-        let referral_source = dec.read_opt_field::<HostAddress>(nulls, 3, offsets[4])?;
+        let username = dec.read_var_string(offsets[0], "username")?;
+        let identity_token = dec.read_opt_string(nulls, 0, offsets[1], "identity_token")?;
+        let language = dec.read_var_string(offsets[2], "language")?;
+        let referral_data = dec.read_opt_bytes(nulls, 1, offsets[3], "referral_data")?;
+        let referral_source = dec.read_opt_field::<HostAddress>(nulls, 2, offsets[4])?;
 
         Ok(Self {
-            protocol_hash,
+            protocol_crc,
+            protocol_build_number,
+            client_version,
             client_type,
             uuid,
-            language,
-            identity_token,
             username,
+            identity_token,
+            language,
             referral_data,
             referral_source,
         })

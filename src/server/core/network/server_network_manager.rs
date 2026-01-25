@@ -15,12 +15,16 @@ use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
 use tokio::time::timeout;
 use uuid::Uuid;
 use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
+use crate::server::core::hytale_server_config::ConnectionTimeouts;
 use crate::server::core::network::connection_manager::{Connection, ConnectionContext};
 use crate::server::core::network::handlers::initial_handler::InitialPacketHandler;
 use crate::server::core::network::packet::packet_error::PacketError;
 use crate::server::core::network::rate_limiter::RateLimiter;
+use crate::server::core::network::stage_timer::StageTimer;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
+const PROTOCOLS: &[&[u8]] = &[b"hytale/2", b"hytale/1"];
+pub const PROTOCOL_CRC: i32 = 1789265863;
 const PORT: &str = "5520";
 
 pub struct ServerNetworkManager {
@@ -82,36 +86,37 @@ async fn handle_connection(connecting: Connecting) {
 
     info!("New connection from {}: {}", remote_addr, connection_id);
 
-    let rate_limiter = Arc::new(Mutex::new({
-        let config = HYTALE_SERVER.config.read();
-        RateLimiter::new(
-            config.rate_limit.max_tokens,
-            config.rate_limit.refill_rate,
-        )
-    }));
+    // Wait for stream
+    match timeout(ConnectionTimeouts::stream_timeout(), connection.accept_bi()).await {
+        Ok(Ok((send, recv))) => {
+            let initial_packet_handler = Box::new(InitialPacketHandler {});
 
-    // Accept streams
-    loop {
-        match connection.accept_bi().await {
-            Ok((send, recv)) => {
-                let initial_packet_handler = Box::new(InitialPacketHandler {});
-                let conn = Connection {
-                    id: connection_id.clone(),
-                    address: remote_addr,
-                    rate_limiter: rate_limiter.clone(),
-                    handler: initial_packet_handler,
-                    context: ConnectionContext {
-                        writer: Arc::new(tokio::sync::Mutex::new(send))
-                    }
-                };
-                tokio::spawn(conn.run(recv));
-            }
-            Err(e) if !matches!(ConnectionError::ConnectionClosed, _e) => {
-                error!("Stream Error: {}", e);
-                break;
-            }
-            Err(_) => { /* Disconnect */ }
+            let rate_limiter = {
+                let config = HYTALE_SERVER.config.read().await;
+                RateLimiter::new(
+                    config.rate_limit.max_tokens,
+                    config.rate_limit.refill_rate,
+                )
+            };
+
+            let context = ConnectionContext {
+                writer: tokio::sync::Mutex::new(send),
+                timer: tokio::sync::Mutex::new(StageTimer::new(None))
+            };
+
+            let conn = Connection {
+                id: connection_id,
+                address: remote_addr,
+                handler: initial_packet_handler,
+                rate_limiter,
+                context
+            };
+
+            conn.run(recv).await;
         }
+        Ok(Err(ConnectionError::ConnectionClosed(_))) => { /* Disconnect */ }
+        Ok(Err(e)) => error!("Connection stream error: {}", e),
+        Err(_) => error!("Timed out waiting for a stream from the client!!!")
     }
 }
 
@@ -121,7 +126,7 @@ fn build_server_config(cert_chain: Vec<CertificateDer<'static>>, key: PrivateKey
         // .with_client_cert_verifier(Arc::new(InsecureClientVerifier))
         .with_single_cert(cert_chain, key)?;
 
-    tls.alpn_protocols = vec![b"hytale/1".to_vec()];
+    tls.alpn_protocols = PROTOCOLS.to_vec().iter().map(|b| b.to_vec()).collect();
 
     let quic_config = QuicServerConfig::try_from(tls)?;
     let transport_config = build_transport_config()?;
@@ -139,7 +144,7 @@ fn build_transport_config() -> anyhow::Result<TransportConfig> {
     transport.receive_window(524_288u32.into());
     transport.stream_receive_window(131_072u32.into());
 
-    let play_timeout = HYTALE_SERVER.config.read().connection_timeouts.play_timeout;
+    let play_timeout = ConnectionTimeouts::max_idle_timeout();
     transport.max_idle_timeout(Some(play_timeout.try_into()?));
 
     transport.mtu_discovery_config(Some(quinn::MtuDiscoveryConfig::default()));

@@ -1,11 +1,11 @@
-use std::time::Duration;
+use crate::handle_packet;
 use crate::protocol::packets::connect::Connect;
 use crate::server::core::hytale_server::HYTALE_SERVER;
 use crate::server::core::network::connection_manager::{ConnectionContext};
 use crate::server::core::network::handlers::authentication_handler::AuthenticationPacketHandler;
 use crate::server::core::network::packet::packet::Packet;
-use crate::server::core::network::packet::packet_decoder::PacketDecoder;
 use crate::server::core::network::packet::packet_handler::{HandlerAction, PacketHandler};
+use crate::server::core::network::server_network_manager::PROTOCOL_CRC;
 
 pub struct InitialPacketHandler {}
 
@@ -13,18 +13,24 @@ pub struct InitialPacketHandler {}
 impl PacketHandler for InitialPacketHandler {
     async fn handle(&mut self, packet_id: u32, data: &[u8], cx: &mut ConnectionContext) -> Result<HandlerAction, String> {
         match packet_id {
-            0x00 => {
-                let Some(packet) = PacketDecoder::decode::<Connect>(data) else {
-                    return Ok(HandlerAction::Disconnect("Failed to decode packet!".to_string()));
-                };
-
-                Ok(HandlerAction::Transition(Box::new(AuthenticationPacketHandler {})))
-            },
+            0x00 => handle_packet!(Connect, data, handle_connect, cx),
             _ => Err(format!("Unexpected packet 0x{:02X} in Handshake", packet_id)),
         }
     }
 
-    fn timeout(&self) -> Duration {
-        HYTALE_SERVER.config.read().connection_timeouts.initial_timeout
+    async fn register(&mut self, cx: &mut ConnectionContext) {
+        cx.set_timeout(HYTALE_SERVER.config.read().await.timeouts.initial).await;
     }
+}
+
+async fn handle_connect(packet: Connect, cx: &mut ConnectionContext) -> Result<HandlerAction, String> {
+    cx.clear_timeout().await;
+
+    if packet.protocol_crc != PROTOCOL_CRC {
+        return Ok(HandlerAction::Disconnect("incompatible protocols".into()))
+    }
+
+    println!("{:?}", packet);
+
+    Ok(HandlerAction::Transition(Box::new(AuthenticationPacketHandler {})))
 }

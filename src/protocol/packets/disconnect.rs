@@ -42,7 +42,7 @@ impl Packet for Disconnect {
         let nulls = dec.read_null_bits()?;
         let cause = DisconnectCause::try_from(dec.read_u8("cause")?)?;
         let offsets = dec.read_offsets::<1>()?;
-        let reason = dec.read_opt_string(nulls, 1, offsets[0], "reason")?;
+        let reason = dec.read_opt_string(nulls, 0, offsets[0], "reason")?;
         Ok(Self { reason, cause })
     }
 }

@@ -1,6 +1,9 @@
 use log::{debug, error, info};
+use quinn::{ReadError, ReadExactError, RecvStream};
 use tokio::time::Instant;
 use uuid::Uuid;
+use crate::server::core::network::connection_manager::MAX_PACKET_SIZE;
+use crate::server::core::network::packet::{MAX_VARINT, MAX_VARINT_ITERATIONS};
 use crate::server::core::network::packet::packet::{Packet, PacketField};
 use crate::server::core::network::packet::packet_error::PacketError;
 
@@ -23,7 +26,6 @@ impl<'a> PacketDecoder<'a> {
         let end_time = start_time.elapsed();
 
         info!("Decoded Packet 0x{:02X} in {:?}", P::packet_id(), end_time);
-        dbg!(&packet);
         Some(packet)
     }
 
@@ -383,12 +385,11 @@ pub fn is_null_bit_set(nulls: u8, bit: u8) -> bool {
 
 #[inline]
 pub fn read_varint_at(buf: &[u8], mut pos: usize, field: &'static str) -> Result<(usize, usize), PacketError> {
-    const MAX_ITERATIONS: usize = 5;  // Max 5 bytes for 32-bit varint
     let mut value = 0usize;
     let mut shift = 0u32;
     let len = buf.len();
 
-    for _ in 0..MAX_ITERATIONS {
+    for _ in 0..MAX_VARINT_ITERATIONS {
         if pos >= len {
             return Err(PacketError::DecodeEOF { field });
         }
@@ -398,6 +399,9 @@ pub fn read_varint_at(buf: &[u8], mut pos: usize, field: &'static str) -> Result
         value |= ((byte & 0x7F) as usize) << shift;
 
         if byte & 0x80 == 0 {
+            if value > MAX_VARINT {
+                return Err(PacketError::DecodeVarIntOverflow { field });
+            }
             return Ok((value, pos));
         }
 
@@ -405,4 +409,40 @@ pub fn read_varint_at(buf: &[u8], mut pos: usize, field: &'static str) -> Result
     }
 
     Err(PacketError::DecodeVarIntOverflow { field })
+}
+
+/// Read framed packet from stream
+/// Returns: (packet_id, body_bytes)
+pub async fn read_framed_packet(recv: &mut RecvStream) -> Result<(u32, Vec<u8>), PacketError> {
+    let mut header = [0u8; 8];
+
+    recv.read_exact(&mut header).await.map_err(|err| map_read_error(err))?;
+
+    let payload_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+    let packet_id = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
+
+    if payload_len <= 0 || payload_len > MAX_PACKET_SIZE {
+        return Err(PacketError::DecodeInvalidPayloadLength {
+            size: payload_len,
+            min: 0,
+            max: MAX_PACKET_SIZE
+        })
+    }
+    let payload_len = payload_len as usize;
+
+    let mut payload = vec![0u8; payload_len];
+    recv.read_exact(&mut payload).await.map_err(|err| map_read_error(err))?;
+
+    Ok((packet_id, payload))
+}
+
+#[inline]
+fn map_read_error(err: ReadExactError) -> PacketError {
+    match err {
+        ReadExactError::ReadError(read_err) => match read_err {
+            ReadError::ConnectionLost(_) | ReadError::ClosedStream => PacketError::ConnectionLost,
+            _ => PacketError::Error { reason: "Failed to read packet", error: read_err.to_string() },
+        },
+        _ => PacketError::Error { reason: "Failed to read packet", error: err.to_string() },
+    }
 }
