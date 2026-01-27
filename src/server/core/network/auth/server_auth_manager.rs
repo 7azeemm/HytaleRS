@@ -1,36 +1,158 @@
-use std::sync::LazyLock;
-use std::time::Instant;
-use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use std::sync::{Arc};
+use ahash::HashMap;
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use chrono::{DateTime, Duration, TimeZone, Utc};
+use log::{error, info};
+use once_cell::sync::OnceCell;
+use serde_json::Value;
+use tokio::sync::Mutex;
+use tokio::time::Instant;
+use uuid::Uuid;
+use crate::GLOBAL_SCHEDULER;
+use crate::server::core::network::auth::credential_store::{CredentialStore, AuthTokens};
+use crate::server::core::network::auth::jwt_validator::JWTValidator;
+use crate::server::core::network::auth::services::auth_service::AuthService;
+use crate::server::core::network::auth::services::session_service::{GameProfile, GameSession, SessionService};
 
-// pub static SERVER_AUTH_MANAGER: LazyLock<ServerAuthManager> = LazyLock::new(ServerAuthManager::new);
-// 
-// pub struct ServerAuthManager {
-//     auth_mode: _,
-//     token_expiry: _,
-//     game_session: _,
-//     credential_store: _,
-//     available_profiles: _,
-//     pending_profiles: _,
-//     pending_auth_mode: _,
-//     server_certificate: _,
-//     server_session_id: _,
-// 
-//     oauth_client: _,
-//     session_service_client: _,
-//     profile_service_client: _,
-// }
-// 
-// impl ServerAuthManager {
-//     fn new() -> Self {
-//         todo!()
-//     }
-// }
-// 
-// pub struct OAuthTokens {
-//     access_token: Option<String>,
-//     refresh_token: Option<String>,
-//     access_token_expiry: Option<Instant>
-// }
+static SERVER_AUTH_MANAGER: OnceCell<ServerAuthManager> = OnceCell::new();
+
+#[derive(Debug)]
+pub struct ServerAuthManager {
+    pub session_id: Uuid,
+    pub session_service: Arc<SessionService>,
+    pub auth_service: Arc<AuthService>,
+    pub jwt_validator: Arc<JWTValidator>,
+    pub credential_store: CredentialStore,
+    pub profiles: Mutex<HashMap<String, GameProfile>>,
+    pub game_session: Mutex<Option<GameSession>>
+}
+
+impl ServerAuthManager {
+    pub async fn init() {
+        let session_service = Arc::new(SessionService::new());
+
+        SERVER_AUTH_MANAGER.set(Self {
+            session_id: Uuid::new_v4(),
+            session_service: session_service.clone(),
+            auth_service: Arc::new(AuthService::new()),
+            jwt_validator: JWTValidator::new(session_service).await,
+            credential_store: CredentialStore::new().await,
+            profiles: Mutex::new(HashMap::default()),
+            game_session: Mutex::new(None)
+        }).unwrap();
+
+        Self::get().auth().await;
+    }
+
+    pub async fn auth(&self) {
+        if !self.credential_store.has_tokens().await {
+            info!("No Server credentials found, please run /auth command to authenticate the server.");
+            return;
+        }
+
+        info!("Attempting to restore game session...");
+
+        let Some(access_token) = self.refresh_auth_tokens().await else { return };
+        let Some(profiles) = self.session_service.fetch_game_profiles(&access_token).await else { return };
+
+        {
+            let mut map = self.profiles.lock().await;
+            map.clear();
+            for profile in profiles.iter() {
+                map.insert(profile.uuid.clone(), profile.clone());
+            }
+        }
+
+        let profile = self.try_select_profile(profiles).await;
+        info!("Selected profile {} ({})", profile.username, profile.uuid);
+
+        let Some(game_session) = self.session_service.create_game_session(&access_token, &profile.uuid).await else { return };
+        schedule_token_refresh(&game_session);
+
+        *self.game_session.lock().await = Some(game_session);
+        self.credential_store.set_profile(profile.uuid.clone()).await;
+
+        info!("The server has been authenticated")
+    }
+
+    async fn refresh_auth_tokens(&self) -> Option<String> {
+        let mut lock = self.credential_store.tokens.lock().await;
+        let tokens = lock.as_ref().unwrap();
+        if tokens.expires_at < Utc::now() + Duration::seconds(300) {
+            info!("Refreshing Auth Tokens...");
+            match self.auth_service.refresh_tokens(&tokens.refresh_token).await {
+                Err(err) => error!("Failed to refresh auth tokens: {}", err),
+                Ok(new_tokens) => {
+                    let access_token = new_tokens.access_token.clone();
+                    *lock = Some(new_tokens);
+                    info!("Refreshed Auth Tokens successfully");
+                    return Some(access_token);
+                }
+            };
+            return None
+        }
+        Some(tokens.access_token.clone())
+    }
+
+    async fn try_select_profile(&self, profiles: Vec<GameProfile>) -> GameProfile {
+        if profiles.len() > 1 {
+            let profile = self.credential_store.profile.lock().await;
+            if let Some(profile) = profile.as_ref() {
+                if let Some(selected_profile) = self.profiles.lock().await.get(profile) {
+                    return selected_profile.clone();
+                }
+            }
+            // TODO: select with command
+            info!("Found multiple profiles, selecting first one");
+        }
+
+        profiles.first().unwrap().clone()
+    }
+
+    pub fn get() -> &'static ServerAuthManager {
+        SERVER_AUTH_MANAGER.get().unwrap()
+    }
+}
+
+fn schedule_token_refresh(session: &GameSession) {
+    let _expiry = match get_effective_expiry(session) {
+        Some(e) => e,
+        None => {
+            error!("Failed to get game session expiry. Token refresher won't be scheduled");
+            return;
+        }
+    };
+
+    //TODO: impl refresher
+}
+
+fn get_effective_expiry(session: &GameSession) -> Option<DateTime<Utc>> {
+    let identity_expiry = parse_identity_token_expiry(&session.identity_token);
+    let session_expiry = DateTime::parse_from_rfc3339(&session.expires_at)
+        .ok().map(|dt| dt.with_timezone(&Utc));
+
+    match (session_expiry, identity_expiry) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
+fn parse_identity_token_expiry(token: &str) -> Option<DateTime<Utc>> {
+    let mut parts = token.split('.');
+    let _header = parts.next()?;
+    let payload = parts.next()?;
+
+    let decoded = URL_SAFE_NO_PAD.decode(payload).ok()?;
+    let json: Value = serde_json::from_slice(&decoded).ok()?;
+
+    let exp = json.get("exp")?.as_i64()?;
+    Utc.timestamp_opt(exp, 0).single()
+}
+
 
 
 
@@ -59,15 +181,6 @@ use serde::{Deserialize, Serialize};
 [2026/01/18 18:40:25   INFO]            [ServerAuthManager] Token refresh scheduled in 3301 seconds
 [2026/01/18 18:40:25   INFO]            [ServerAuthManager] Authentication successful! Mode: OAUTH_STORE
 [2026/01/18 18:40:25   INFO]            [ServerAuthManager] Session restored from stored credentials
- */
-
-/*
-fn generate_self_signed_cert() -> Result<(Vec<u8>, Vec<u8>)> {
-    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()])?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
-    Ok((cert_pem.into_bytes(), key_pem.into_bytes()))
-}
  */
 
 /*

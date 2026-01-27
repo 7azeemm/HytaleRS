@@ -15,7 +15,12 @@ use crate::server::core::{hytale_server_config, options};
 use crate::server::core::network::server_network_manager::ServerNetworkManager;
 
 pub static HYTALE_SERVER: LazyLock<Arc<HytaleServer>> = LazyLock::new(|| Arc::new(HytaleServer::new()));
+pub static BOOTED: AtomicBool = AtomicBool::new(false);
+pub static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 static SHOULD_STOP: AtomicBool = AtomicBool::new(false);
+
+// TODO: move to another place
+pub const VERSION: &str = "2026.01.24-6e2d4fc36";
 
 #[derive(Debug)]
 pub struct HytaleServer {
@@ -46,14 +51,15 @@ impl HytaleServer {
         }
     }
     
-    pub fn init(&self) {
-        ServerNetworkManager::init().expect("Failed to initialize Server Network Manager");
-
-        //TODO: auth
-        //TODO: NettyUtil (Packet Logging?)
+    pub async fn init(&self) {
         //TODO: register assets
         //TODO: register core plugins
 
+        // Contains ServerAuthManager which gets called after registering
+        // the command manager and plugin manager setup in the original java code
+        ServerNetworkManager::init().await.expect("Failed to initialize Server Network Manager");
+
+        BOOTED.store(true, Ordering::Relaxed);
         info!("Server took {:.2?} to start", self.boot_start.elapsed());
     }
 
@@ -61,5 +67,6 @@ impl HytaleServer {
         while !SHOULD_STOP.load(Ordering::Relaxed) {
             sleep(Duration::from_millis(50)).await;
         }
+        SHOULD_STOP.store(true, Ordering::Relaxed);
     }
 }

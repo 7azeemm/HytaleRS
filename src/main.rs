@@ -7,12 +7,12 @@ use crate::logger::hytale_logger;
 use crate::logger::hytale_logger::AsyncLogger;
 use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
 use crate::server::core::options;
-use crate::util::scheduler::scheduler::Scheduler;
+use crate::utils::scheduler::scheduler::Scheduler;
 
 mod logger;
 mod server;
 mod event;
-mod util;
+mod utils;
 mod plugin;
 mod protocol;
 
@@ -22,7 +22,7 @@ pub static GLOBAL_SCHEDULER: LazyLock<Scheduler> = LazyLock::new(|| Scheduler::n
 async fn main() {
     options::parse();
     AsyncLogger::init().expect("Failed to setup logger");
-    HYTALE_SERVER.init();
+    HYTALE_SERVER.init().await;
 
     HYTALE_SERVER.start().await;
     info!("Server Stopped")

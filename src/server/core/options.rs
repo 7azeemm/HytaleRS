@@ -87,11 +87,11 @@ pub struct Options {
     // #[arg(long, help = "Singleplayer mode")]
     // pub singleplayer: bool,
 
-    #[arg(long, help = "Owner name")]
-    pub owner_name: Option<String>,
+    // #[arg(long, help = "Owner name")]
+    // pub owner_name: Option<String>,
 
-    #[arg(long, help = "Owner UUID")]
-    pub owner_uuid: Option<String>,
+    // #[arg(long, help = "Owner UUID")]
+    // pub owner_uuid: Option<String>,
 
     #[arg(long, help = "Client PID")]
     pub client_pid: Option<u32>,
@@ -180,6 +180,7 @@ fn parse_migrations(s: &str) -> Result<HashMap<String, PathBuf>, String> {
     Ok(map)
 }
 
+//TODO: remove
 #[derive(Debug, Clone, ValueEnum)]
 pub enum AuthMode {
     Authenticated,

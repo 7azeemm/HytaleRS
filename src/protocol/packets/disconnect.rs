@@ -26,13 +26,13 @@ impl Packet for Disconnect {
     fn encode(&self, writer: &mut Vec<u8>) -> Result<(), PacketError> {
         let mut enc = PacketEncoder::new(writer);
 
-        let nulls = if self.reason.is_some() { 1 << 0 } else { 0 };
+        let nulls = if self.reason.is_some() { 1 } else { 0 };
         enc.write_null_bits(nulls);
         enc.write_u8(self.cause as u8);
 
-        let mut offsets = enc.reserve_offsets::<1>()?;
-        offsets.write_opt_string(self.reason.as_deref(), "reason")?;
-        offsets.finish()?;
+        if let Some(reason) = &self.reason {
+            enc.write_var_string(reason, "reason")?;
+        }
 
         Ok(())
     }
@@ -41,8 +41,7 @@ impl Packet for Disconnect {
         let mut dec = PacketDecoder::new(buf);
         let nulls = dec.read_null_bits()?;
         let cause = DisconnectCause::try_from(dec.read_u8("cause")?)?;
-        let offsets = dec.read_offsets::<1>()?;
-        let reason = dec.read_opt_string(nulls, 0, offsets[0], "reason")?;
+        let reason = dec.read_opt_varint_string(nulls, 1, "reason")?;
         Ok(Self { reason, cause })
     }
 }

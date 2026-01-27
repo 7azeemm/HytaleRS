@@ -6,6 +6,7 @@ use std::time::Duration;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
+use rustls::pki_types::CertificateDer;
 use tokio::time::timeout;
 use crate::protocol::packets::disconnect::{Disconnect, DisconnectCause};
 use crate::server::core::hytale_server::HYTALE_SERVER;
@@ -16,8 +17,8 @@ use crate::server::core::network::packet::packet_error::{PacketError};
 use crate::server::core::network::packet::packet_decoder::{read_framed_packet, PacketDecoder};
 use crate::server::core::network::packet::packet_encoder::PacketEncoder;
 use crate::server::core::network::packet::packet_handler::{HandlerAction, PacketHandler};
-use crate::server::core::network::rate_limiter::RateLimiter;
-use crate::server::core::network::stage_timer::StageTimer;
+use crate::server::core::network::utils::rate_limiter::RateLimiter;
+use crate::server::core::network::utils::stage_timer::StageTimer;
 
 pub struct Connection {
     pub id: String,
@@ -68,18 +69,18 @@ impl Connection {
 
                     // Handle packet
                     match self.handler.handle(packet_id, &body, &mut self.context).await {
-                        Ok(HandlerAction::Continue) => {},
-                        Ok(HandlerAction::Transition(new_handler)) => {
+                        HandlerAction::Continue => {},
+                        HandlerAction::Transition(new_handler) => {
                             info!("Handler changed for {}", self.address);
                             self.handler = new_handler;
                             self.handler.register(&mut self.context).await;
                         },
-                        Ok(HandlerAction::Disconnect(reason)) => {
+                        HandlerAction::Disconnect(reason) => {
                             self.context.disconnect(&reason).await;
                             break;
                         },
-                        Err(e) => {
-                            error!("Protocol error: {}", e);
+                        HandlerAction::Error(error) => {
+                            error!("Protocol Error: {}", error);
                             self.context.disconnect("Protocol Error").await;
                             break;
                         }
@@ -100,6 +101,7 @@ impl Connection {
 pub struct ConnectionContext {
     pub writer: tokio::sync::Mutex<SendStream>,
     pub timer: tokio::sync::Mutex<StageTimer>,
+    pub(crate) client_cert: Vec<CertificateDer<'static>>
 }
 
 impl ConnectionContext {
@@ -114,6 +116,7 @@ impl ConnectionContext {
         Some(())
     }
 
+    // Todo: maybe can be non-async and spawns a tokio thread to send the packet
     pub async fn disconnect(&self, reason: &str) {
         info!("Disconnecting..., reason: {}", reason);
         self.send(&Disconnect {

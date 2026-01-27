@@ -1,10 +1,10 @@
-use crate::util::io::codec::iso8601_duration;
+use crate::utils::io::codec::iso8601_duration;
 use std::time::Duration;
 use ahash::HashMap;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use crate::plugin::plugin_identifier::PluginIdentifier;
-use crate::util::io::json_config::JsonConfig;
+use crate::utils::io::json_config::JsonConfig;
 
 const CONFIG_PATH: &str = "config.json";
 const VERSION: u32 = 3;
@@ -33,7 +33,7 @@ pub struct HytaleServerConfig {
     pub display_tmp_tags_in_strings: bool,
 
     // pub player_storage: ,
-    // pub auth_credential_store: ,
+    pub auth_credential_store_path: String,
 }
 
 impl Default for HytaleServerConfig {
@@ -52,6 +52,7 @@ impl Default for HytaleServerConfig {
             log_levels: HashMap::default(),
             mods: HashMap::default(),
             display_tmp_tags_in_strings: false,
+            auth_credential_store_path: "auth.enc".to_string()
         }
     }
 }
@@ -86,6 +87,7 @@ pub enum GameMode {
     Creative
 }
 
+// TODO: try DateTime<Utc> instead of Duration (could work without the convertor)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct ConnectionTimeouts {

@@ -376,6 +376,41 @@ impl<'a> PacketDecoder<'a> {
 
         Ok(&var_block[data_pos..end])
     }
+
+    #[inline]
+    pub fn read_varint_string(&mut self, field: &'static str) -> Result<String, PacketError> {
+        let string_bytes = self.read_varint_bytes(field)?;
+        String::from_utf8(string_bytes)
+            .map_err(|_| PacketError::DecodeInvalidUtf8 { field })
+    }
+
+    #[inline]
+    pub fn read_opt_varint_string(&mut self, nulls: u8, bit: u8, field: &'static str) -> Result<Option<String>, PacketError> {
+        if is_null_bit_set(nulls, bit) {
+            let string_bytes = self.read_varint_bytes(field)?;
+            let string = String::from_utf8(string_bytes)
+                .map_err(|_| PacketError::DecodeInvalidUtf8 { field })?;
+            Ok(Some(string))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    pub fn read_varint_bytes(&mut self, field: &'static str) -> Result<Vec<u8>, PacketError> {
+        let (len, new_pos) = read_varint_at(self.buf, self.pos, field)?;
+        self.pos = new_pos;
+
+        let end = self.pos + len;
+        if end > self.buf.len() {
+            return Err(PacketError::DecodeEOF { field });
+        }
+
+        let result = self.buf[self.pos..end].to_vec();
+        self.pos = end;
+
+        Ok(result)
+    }
 }
 
 #[inline]

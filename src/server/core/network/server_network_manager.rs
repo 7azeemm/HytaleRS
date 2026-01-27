@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -8,43 +9,51 @@ use parking_lot::Mutex;
 use quinn::{congestion, Connecting, ConnectionError, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig};
 use quinn::crypto::rustls::QuicServerConfig;
 use rcgen::Certificate;
-use rustls::{DigitallySignedStruct, DistinguishedName, SignatureScheme};
+use rustls::{DigitallySignedStruct, DistinguishedName, RootCertStore, SignatureScheme};
 use rustls::client::danger::HandshakeSignatureValid;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, UnixTime};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, TrustAnchor, UnixTime};
+use rustls::server::{ClientCertVerifierBuilder, NoClientAuth, WebPkiClientVerifier};
 use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
 use tokio::time::timeout;
 use uuid::Uuid;
 use crate::server::core::hytale_server::{HytaleServer, HYTALE_SERVER};
 use crate::server::core::hytale_server_config::ConnectionTimeouts;
+use crate::server::core::network::auth::server_auth_manager::{ServerAuthManager};
+use crate::server::core::network::auth::services::session_service::SessionService;
 use crate::server::core::network::connection_manager::{Connection, ConnectionContext};
 use crate::server::core::network::handlers::initial_handler::InitialPacketHandler;
 use crate::server::core::network::packet::packet_error::PacketError;
-use crate::server::core::network::rate_limiter::RateLimiter;
-use crate::server::core::network::stage_timer::StageTimer;
+use crate::server::core::network::utils::client_verifier::ClientVerifier;
+use crate::server::core::network::utils::rate_limiter::RateLimiter;
+use crate::server::core::network::utils::stage_timer::StageTimer;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
-const PROTOCOLS: &[&[u8]] = &[b"hytale/2", b"hytale/1"];
 pub const PROTOCOL_CRC: i32 = 1789265863;
+const PROTOCOLS: &[&[u8]] = &[b"hytale/2", b"hytale/1"];
 const PORT: &str = "5520";
 
 pub struct ServerNetworkManager {
     pub endpoint: Endpoint,
+    pub(crate) server_certificate: Vec<CertificateDer<'static>>
 }
 
 impl ServerNetworkManager {
-    pub fn init() -> Result<(), Box<dyn Error>> {
+    pub async fn init() -> Result<(), Box<dyn Error>> {
         let _ = rustls::crypto::ring::default_provider().install_default();
 
         let (cert, key) = generate_self_signed_cert()?;
-        let server_config = build_server_config(cert, key)?;
+        let server_config = build_server_config(cert.clone(), key)?;
 
         let addr = format!("[::]:{PORT}").parse()?;
         let endpoint = Endpoint::server(server_config, addr)?;
-        let manager = ServerNetworkManager { endpoint };
+        let manager = ServerNetworkManager {
+            endpoint,
+            server_certificate: cert
+        };
 
-        if let Err(_) = SERVER_NETWORK_MANAGER.set(manager) {
-            panic!("Server Network Manager already initialized")
-        }
+        let _ = SERVER_NETWORK_MANAGER.set(manager);
+
+        ServerAuthManager::init().await;
 
         tokio::spawn(run_accept_loop(SERVER_NETWORK_MANAGER.get().unwrap()));
         info!("Server is listening on port {PORT}");
@@ -86,6 +95,14 @@ async fn handle_connection(connecting: Connecting) {
 
     info!("New connection from {}: {}", remote_addr, connection_id);
 
+    let client_cert = match connection.peer_identity().map(|p| p.downcast::<Vec<CertificateDer>>()) {
+        Some(Ok(cert)) => *cert,
+        _ => {
+            error!("Connection rejected: no client certificate from {}", remote_addr);
+            return;
+        }
+    };
+
     // Wait for stream
     match timeout(ConnectionTimeouts::stream_timeout(), connection.accept_bi()).await {
         Ok(Ok((send, recv))) => {
@@ -101,7 +118,8 @@ async fn handle_connection(connecting: Connecting) {
 
             let context = ConnectionContext {
                 writer: tokio::sync::Mutex::new(send),
-                timer: tokio::sync::Mutex::new(StageTimer::new(None))
+                timer: tokio::sync::Mutex::new(StageTimer::new(None)),
+                client_cert
             };
 
             let conn = Connection {
@@ -114,7 +132,7 @@ async fn handle_connection(connecting: Connecting) {
 
             conn.run(recv).await;
         }
-        Ok(Err(ConnectionError::ConnectionClosed(_))) => { /* Disconnect */ }
+        Ok(Err(ConnectionError::ConnectionClosed(_))) => { info!("Connection closed!") }
         Ok(Err(e)) => error!("Connection stream error: {}", e),
         Err(_) => error!("Timed out waiting for a stream from the client!!!")
     }
@@ -122,8 +140,7 @@ async fn handle_connection(connecting: Connecting) {
 
 fn build_server_config(cert_chain: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> anyhow::Result<ServerConfig> {
     let mut tls = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        // .with_client_cert_verifier(Arc::new(InsecureClientVerifier))
+        .with_client_cert_verifier(Arc::new(ClientVerifier))
         .with_single_cert(cert_chain, key)?;
 
     tls.alpn_protocols = PROTOCOLS.to_vec().iter().map(|b| b.to_vec()).collect();
