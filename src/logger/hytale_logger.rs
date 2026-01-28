@@ -18,7 +18,7 @@ struct LogMessage {
 }
 
 impl AsyncLogger {
-    pub fn init() -> Result<(), Box<dyn std::error::Error>> {
+    pub fn init() {
         let (tx, rx) = unbounded();
 
         // Spawn logger thread
@@ -27,10 +27,8 @@ impl AsyncLogger {
         });
 
         // Set global logger
-        log::set_boxed_logger(Box::new(AsyncLogger { sender: tx }))?;
         log::set_max_level(log::LevelFilter::Info);
-
-        Ok(())
+        log::set_boxed_logger(Box::new(AsyncLogger { sender: tx })).expect("Failed to setup logger");
     }
 
     fn logger_thread(rx: Receiver<LogMessage>, log_dir: &str) {

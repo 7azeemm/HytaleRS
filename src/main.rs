@@ -16,12 +16,10 @@ mod utils;
 mod plugin;
 mod protocol;
 
-pub static GLOBAL_SCHEDULER: LazyLock<Scheduler> = LazyLock::new(|| Scheduler::new());
-
 #[tokio::main]
 async fn main() {
     options::parse();
-    AsyncLogger::init().expect("Failed to setup logger");
+    AsyncLogger::init();
     HYTALE_SERVER.init().await;
 
     HYTALE_SERVER.start().await;
