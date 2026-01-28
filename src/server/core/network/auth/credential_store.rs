@@ -55,21 +55,22 @@ impl CredentialStore {
         let encryption_key = Self::derive_key().await;
         let path = PathBuf::from(HYTALE_SERVER.config.read().await.auth_credential_store_path.clone());
 
-        let mut store = Self {
+        Self {
             path,
             encryption_key,
             tokens: Mutex::new(None),
             profile: Mutex::new(None)
-        };
-
-        store.load().await;
-        store
+        }
     }
 
     pub async fn set_profile(&self, profile: String) {
-        *self.profile.lock().await = Some(profile);
-        if let Err(err) = self.save().await {
-            error!("Failed to save server credentials: {err}")
+        let mut current_profile = self.profile.lock().await;
+        let new_profile = Some(profile);
+        if *current_profile != new_profile {
+            *current_profile = new_profile;
+            if let Err(err) = self.save().await {
+                error!("Failed to save server credentials: {err}")
+            }
         }
     }
 
@@ -95,7 +96,7 @@ impl CredentialStore {
         key
     }
 
-    pub async fn load(&mut self) {
+    pub async fn load(&self) {
         if !self.path.exists() { return }
 
         let bytes = match fs::read(&self.path) {
@@ -138,7 +139,7 @@ impl CredentialStore {
         };
 
         let stored_tokens = StoredAuthTokens {
-            access_token: tokens.refresh_token.clone(),
+            access_token: tokens.access_token.clone(),
             refresh_token: tokens.refresh_token.clone(),
             expires_at: tokens.expires_at,
             profile_uuid: self.profile.lock().await.clone()

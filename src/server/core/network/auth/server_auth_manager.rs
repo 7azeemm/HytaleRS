@@ -7,7 +7,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use log::{error, info};
 use once_cell::sync::OnceCell;
 use serde_json::Value;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::Instant;
 use uuid::Uuid;
 use crate::GLOBAL_SCHEDULER;
@@ -15,6 +15,17 @@ use crate::server::core::network::auth::credential_store::{CredentialStore, Auth
 use crate::server::core::network::auth::jwt_validator::JWTValidator;
 use crate::server::core::network::auth::services::auth_service::AuthService;
 use crate::server::core::network::auth::services::session_service::{GameProfile, GameSession, SessionService};
+
+/*
+1. Fetch JWKS (Used for player auth, not server auth) (in tokio task without awaiting)
+2. Load credentials (tokens), if exists:
+3. If tokens are valid, attempt to restore game session:
+4. If tokens expired, refresh and save them
+5. Fetch game profiles and select one
+6. If selected profile is not set, save it (in the credentials file)
+7. Create game session
+8. Schedule game session refresh (1 Hour)
+*/
 
 static SERVER_AUTH_MANAGER: OnceCell<ServerAuthManager> = OnceCell::new();
 
@@ -26,7 +37,8 @@ pub struct ServerAuthManager {
     pub jwt_validator: Arc<JWTValidator>,
     pub credential_store: CredentialStore,
     pub profiles: Mutex<HashMap<String, GameProfile>>,
-    pub game_session: Mutex<Option<GameSession>>
+    pub game_session: Mutex<Option<GameSession>>,
+    pub auth_state: RwLock<AuthState>
 }
 
 impl ServerAuthManager {
@@ -40,60 +52,96 @@ impl ServerAuthManager {
             jwt_validator: JWTValidator::new(session_service).await,
             credential_store: CredentialStore::new().await,
             profiles: Mutex::new(HashMap::default()),
-            game_session: Mutex::new(None)
+            game_session: Mutex::new(None),
+            auth_state: RwLock::new(AuthState::Uninitialized),
         }).unwrap();
 
-        Self::get().auth().await;
+        let instance = Self::get();
+        instance.credential_store.load().await;
+        instance.auth().await;
     }
 
-    pub async fn auth(&self) {
+    async fn auth(&self) {
+        self.set_auth_state(AuthState::Authenticating).await;
+
         if !self.credential_store.has_tokens().await {
+            self.set_auth_state(AuthState::Failed(AuthError::NoCredentials)).await;
             info!("No Server credentials found, please run /auth command to authenticate the server.");
             return;
         }
 
         info!("Attempting to restore game session...");
 
-        let Some(access_token) = self.refresh_auth_tokens().await else { return };
-        let Some(profiles) = self.session_service.fetch_game_profiles(&access_token).await else { return };
+        let Some(access_token) = self.refresh_auth_tokens().await else {
+            self.set_auth_state(AuthState::Failed(AuthError::RefreshFailed)).await;
+            return;
+        };
+
+        let Some(profiles) = self.session_service.fetch_game_profiles(&access_token).await else {
+            self.set_auth_state(AuthState::Failed(AuthError::NetworkError)).await;
+            return;
+        };
 
         {
-            let mut map = self.profiles.lock().await;
-            map.clear();
+            let mut profiles_lock = self.profiles.lock().await;
+            profiles_lock.clear();
             for profile in profiles.iter() {
-                map.insert(profile.uuid.clone(), profile.clone());
+                profiles_lock.insert(profile.uuid.clone(), profile.clone());
             }
         }
 
         let profile = self.try_select_profile(profiles).await;
         info!("Selected profile {} ({})", profile.username, profile.uuid);
-
-        let Some(game_session) = self.session_service.create_game_session(&access_token, &profile.uuid).await else { return };
-        schedule_token_refresh(&game_session);
-
-        *self.game_session.lock().await = Some(game_session);
         self.credential_store.set_profile(profile.uuid.clone()).await;
 
-        info!("The server has been authenticated")
+        let Some(game_session) = self.session_service.create_game_session(&access_token, &profile.uuid).await else {
+            self.set_auth_state(AuthState::Failed(AuthError::NetworkError)).await;
+            return;
+        };
+
+        self.on_new_game_session(game_session).await;
+        info!("Server has been authenticated successfully")
+    }
+
+    async fn on_new_game_session(&self, game_session: GameSession) {
+        schedule_game_session_refresh(&game_session, game_session.session_token.clone());
+        *self.game_session.lock().await = Some(game_session);
+        self.set_auth_state(AuthState::Authenticated).await;
     }
 
     async fn refresh_auth_tokens(&self) -> Option<String> {
         let mut lock = self.credential_store.tokens.lock().await;
-        let tokens = lock.as_ref().unwrap();
-        if tokens.expires_at < Utc::now() + Duration::seconds(300) {
-            info!("Refreshing Auth Tokens...");
-            match self.auth_service.refresh_tokens(&tokens.refresh_token).await {
-                Err(err) => error!("Failed to refresh auth tokens: {}", err),
-                Ok(new_tokens) => {
-                    let access_token = new_tokens.access_token.clone();
-                    *lock = Some(new_tokens);
-                    info!("Refreshed Auth Tokens successfully");
-                    return Some(access_token);
-                }
-            };
+        let tokens = lock.as_ref()?;
+
+        // Check if token refresh is needed
+        if tokens.expires_at > Utc::now() + Duration::seconds(300) {
+            return Some(tokens.access_token.clone());
+        }
+
+        if self.get_auth_state().await == AuthState::Refreshing {
+            error!("The server is already refreshing the tokens, try again later.");
             return None
         }
-        Some(tokens.access_token.clone())
+
+        self.set_auth_state(AuthState::Refreshing).await;
+        info!("Refreshing Auth Tokens...");
+
+        match self.auth_service.refresh_tokens(&tokens.refresh_token).await {
+            Err(err) => error!("Failed to refresh auth tokens: {}", err),
+            Ok(new_tokens) => {
+                let access_token = new_tokens.access_token.clone();
+                *lock = Some(new_tokens);
+                drop(lock);
+                info!("Refreshed Auth Tokens successfully");
+
+                if let Err(err) = self.credential_store.save().await {
+                    error!("Failed to save refreshed tokens: {}", err);
+                }
+
+                return Some(access_token);
+            }
+        };
+        None
     }
 
     async fn try_select_profile(&self, profiles: Vec<GameProfile>) -> GameProfile {
@@ -111,21 +159,45 @@ impl ServerAuthManager {
         profiles.first().unwrap().clone()
     }
 
+    pub async fn get_auth_state(&self) -> AuthState {
+        *self.auth_state.read().await
+    }
+
+    async fn set_auth_state(&self, state: AuthState) {
+        *self.auth_state.write().await = state;
+    }
+
     pub fn get() -> &'static ServerAuthManager {
         SERVER_AUTH_MANAGER.get().unwrap()
     }
 }
 
-fn schedule_token_refresh(session: &GameSession) {
-    let _expiry = match get_effective_expiry(session) {
-        Some(e) => e,
-        None => {
-            error!("Failed to get game session expiry. Token refresher won't be scheduled");
-            return;
-        }
+fn schedule_game_session_refresh(session: &GameSession, session_token: String) {
+    let Some(expiry) = get_effective_expiry(session) else {
+        error!("Failed to get game session expiry. Token refresher won't be scheduled");
+        return;
     };
 
-    //TODO: impl refresher
+    // Refresh 5 minutes before expiry, or in 30 seconds if expiring soon
+    let now = Utc::now();
+    let refresh_time = match expiry > now + Duration::minutes(5) {
+        true => expiry - now - Duration::minutes(5),
+        false => Duration::seconds(30)
+    };
+
+    let duration = std::time::Duration::from_secs(refresh_time.num_seconds().max(1) as u64);
+    info!("Scheduled token refresh in {:?}", duration);
+
+    // Schedule a one-time refresh task
+    let _ = GLOBAL_SCHEDULER.schedule_once(duration, move || {
+        tokio::spawn(async move {
+            let manager = ServerAuthManager::get();
+            match manager.session_service.refresh_game_session(&session_token).await {
+                None => manager.set_auth_state(AuthState::Failed(AuthError::RefreshFailed)).await,
+                Some(game_session) => manager.on_new_game_session(game_session).await
+            }
+        });
+    });
 }
 
 fn get_effective_expiry(session: &GameSession) -> Option<DateTime<Utc>> {
@@ -153,61 +225,20 @@ fn parse_identity_token_expiry(token: &str) -> Option<DateTime<Utc>> {
     Utc.timestamp_opt(exp, 0).single()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthState {
+    Uninitialized,
+    Authenticating,
+    Authenticated,
+    TokenExpiring,
+    Refreshing,
+    Failed(AuthError),
+}
 
-
-
-/*
-1. Load Auth Credentials (Encrypted/Memory)
-2. Check if refreshToken is valid, If yes attempt to restore session
-3. If expiresAt is null or close to expire (in the next 5mins) refresh tokens using the refreshToken
-4. Send Request to Hytale to get accessToken and expiresAt
-5. Create SessionServiceClient (used to communicated with Hytale services using the accessToken)
-6. Fetch GameProfiles
-7. Try to auto select profile
-8. Create GameSession (using the GameProfile)
-*/
-
-/*
-[2026/01/18 18:40:21   INFO] [EncryptedAuthCredentialStore] Loaded encrypted credentials from auth.enc
-[2026/01/18 18:40:21   INFO]            [ServerAuthManager] Auth credential store: Encrypted
-[2026/01/18 18:40:21   INFO]            [ServerAuthManager] Found stored credentials, attempting to restore session...
-[2026/01/18 18:40:21   INFO]            [ServerAuthManager] Refreshing OAuth tokens...
-[2026/01/18 18:40:24   INFO]         [SessionServiceClient] Session Service client initialized for: https://sessions.hytale.com
-[2026/01/18 18:40:24   INFO]         [SessionServiceClient] Fetching game profiles...
-[2026/01/18 18:40:24   INFO]         [SessionServiceClient] Found 1 game profile(s)
-[2026/01/18 18:40:24   INFO]            [ServerAuthManager] Auto-selected profile: 7azem (d510c211-ea66-4cc0-a932-e6f8b797fef7)
-[2026/01/18 18:40:24   INFO]         [SessionServiceClient] Creating game session...
-[2026/01/18 18:40:25   INFO]         [SessionServiceClient] Successfully created game session
-[2026/01/18 18:40:25   INFO]            [ServerAuthManager] Token refresh scheduled in 3301 seconds
-[2026/01/18 18:40:25   INFO]            [ServerAuthManager] Authentication successful! Mode: OAUTH_STORE
-[2026/01/18 18:40:25   INFO]            [ServerAuthManager] Session restored from stored credentials
- */
-
-/*
-[2026/01/20 10:04:32   INFO]   [QUICTransport] Received connection from QuicConnectionAddress{connId=} (/[0:0:0:0:0:0:0:1]:61469) to QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:5520)
-[2026/01/20 10:04:34   INFO]          [Hytale] Received stream QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0) to QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:5520, streamId=0)
-[2026/01/20 10:04:34 FINEST]     [LoginTiming] setTimeout-initial
-[2026/01/20 10:04:34   FINE]     [LoginTiming] Registered took 2ms 44us 900ns
-[2026/01/20 10:04:34   FINE]     [LoginTiming] Connect took 504ms 597us 900ns
-[2026/01/20 10:04:34   INFO]          [Hytale] Starting authenticated flow for 7azem (d510c211-ea66-4cc0-a932-e6f8b797fef7) from QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0)
-[2026/01/20 10:04:34   INFO] [SessionServiceClient] Session Service client initialized for: https://sessions.hytale.com
-[2026/01/20 10:04:35   INFO] [SessionServiceClient] Successfully fetched JWKS with 1 keys
-[2026/01/20 10:04:35   INFO]         [JWTValidator] JWKS loaded with 1 keys
-[2026/01/20 10:04:35   INFO]         [JWTValidator] Identity token validated successfully for user null (UUID: d510c211-ea66-4cc0-a932-e6f8b797fef7)
-[2026/01/20 10:04:35   INFO]     [HandshakeHandler] Identity token validated for 7azem (UUID: d510c211-ea66-4cc0-a932-e6f8b797fef7, scope: hytale:client) from QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0), requesting auth grant
-[2026/01/20 10:04:35 FINEST]          [LoginTiming] setTimeout-auth-grant-timeout took 1sec 64ms 905us
-[2026/01/20 10:04:35   INFO] [SessionServiceClient] Requesting authorization grant with identity token, aud='9a5e75a6-689c-4372-9303-11005ec4b7ae'
-[2026/01/20 10:04:36   INFO] [SessionServiceClient] Successfully obtained authorization grant
-[2026/01/20 10:04:36   INFO]     [HandshakeHandler] Sending AuthGrant to QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0) (with server identity: true)
-[2026/01/20 10:04:36 FINEST]          [LoginTiming] setTimeout-auth-token-timeout took 181ms 456us 700ns
-[2026/01/20 10:04:36   INFO]     [HandshakeHandler] Received AuthToken from QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0), validating JWT (mTLS cert present: true, server auth grant: true)
-[2026/01/20 10:04:36   INFO]      [CertificateUtil] Certificate binding validated successfully
-[2026/01/20 10:04:36   INFO]         [JWTValidator] JWT validated successfully for user 7azem (UUID: d510c211-ea66-4cc0-a932-e6f8b797fef7)
-[2026/01/20 10:04:36 FINEST]          [LoginTiming] setTimeout-server-token-exchange-timeout took 698ms 199us 500ns
-[2026/01/20 10:04:36   INFO] [SessionServiceClient] Exchanging authorization grant for access token
-[2026/01/20 10:04:36   INFO] [SessionServiceClient] Successfully obtained access token
-[2026/01/20 10:04:36   INFO]     [HandshakeHandler] Sending ServerAuthToken to QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0) (with password challenge: false)
-[2026/01/20 10:04:36   INFO]     [HandshakeHandler] Mutual authentication complete for 7azem (d510c211-ea66-4cc0-a932-e6f8b797fef7) from QuicConnectionAddress{connId=751105726e17200d274be5d5aa14471d046d24b1} (/[0:0:0:0:0:0:0:1]:61469, streamId=0)
-[2026/01/20 10:04:36   FINE]          [LoginTiming] Authenticated took 172ms 540us 800ns
-[2026/01/20 10:04:36   INFO] [PasswordPacketHandler] Connection complete for 7azem (d510c211-ea66-4cc0-a932-e6f8b797fef7), transitioning to setup
- */
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthError {
+    NoCredentials,
+    InvalidToken,
+    RefreshFailed,
+    NetworkError,
+}

@@ -16,8 +16,6 @@ const JWK_CACHE_EXPIRY: Duration = Duration::from_secs(3600);
 const ALGORITHM: Algorithm = Algorithm::EdDSA;
 const LEEWAY_SECONDS: u64 = 300;
 
-// TODO: if used for server auth system, shouldn't spawn thread maybe
-
 #[derive(Debug)]
 pub struct JWTValidator {
     session_service: Arc<SessionService>,
@@ -36,7 +34,6 @@ impl JWTValidator {
         });
 
         instance.fetch_jwks();
-        instance.fetch_done.notified().await;
         instance
     }
 

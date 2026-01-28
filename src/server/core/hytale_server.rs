@@ -36,11 +36,7 @@ impl HytaleServer {
         let boot_start = Instant::now();
         info!("Starting HytaleRS Server...");
 
-        info!("Loading Config...");
-        let config_time = Instant::now();
         let config = hytale_server_config::load();
-        info!("Config Loaded in {:.2?}", config_time.elapsed());
-        info!("Authentication mode: {}", options::get().auth_mode);
 
         Self {
             event_bus: Mutex::new(EventBus{}),

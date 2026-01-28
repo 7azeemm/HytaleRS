@@ -117,9 +117,6 @@ pub struct Options {
     #[arg(long, help = "Allow self op command")]
     pub allow_op: bool,
 
-    #[arg(long, help = "Authentication mode", default_value_t = AuthMode::Authenticated)]
-    pub auth_mode: AuthMode,
-
     // #[arg(long, help = "Session token for Session Service API")]
     // pub session_token: Option<String>,
 
@@ -178,24 +175,6 @@ fn parse_migrations(s: &str) -> Result<HashMap<String, PathBuf>, String> {
     }
 
     Ok(map)
-}
-
-//TODO: remove
-#[derive(Debug, Clone, ValueEnum)]
-pub enum AuthMode {
-    Authenticated,
-    Offline,
-    Insecure
-}
-
-impl std::fmt::Display for AuthMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AuthMode::Authenticated => write!(f, "authenticated"),
-            AuthMode::Offline => write!(f, "offline"),
-            AuthMode::Insecure => write!(f, "insecure"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, ValueEnum)]

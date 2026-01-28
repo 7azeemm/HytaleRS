@@ -14,6 +14,27 @@ pub struct SessionService {
     client: Client,
 }
 
+#[derive(Deserialize)]
+struct AccountData {
+    profiles: Vec<GameProfile>
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GameProfile {
+    pub uuid: String,
+    pub username: String
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GameSession {
+    #[serde(rename = "sessionToken")]
+    pub session_token: String,
+    #[serde(rename = "identityToken")]
+    pub identity_token: String,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: String
+}
+
 impl SessionService {
     pub fn new() -> Self {
         Self {
@@ -25,6 +46,8 @@ impl SessionService {
     }
 
     pub async fn fetch_jwks(&self) -> Option<JwkSet> {
+        info!("Fetching JWKS...");
+
         let response = self.client
             .get(format!("{SESSION_SERVICE_URL}/.well-known/jwks.json"))
             .header("Accept", "application/json")
@@ -44,7 +67,7 @@ impl SessionService {
                             return None
                         }
 
-                        info!("Successfully fetched JWKS");
+                        info!("Fetched JWKS successfully");
                         return Some(jwks)
                     }
                 }
@@ -55,6 +78,7 @@ impl SessionService {
 
     pub async fn fetch_game_profiles(&self, access_token: &str) -> Option<Vec<GameProfile>> {
         info!("Fetching game profiles...");
+
         let response = self.client
             .get("https://account-data.hytale.com/my-account/get-profiles")
             .header("Accept", "application/json")
@@ -75,7 +99,7 @@ impl SessionService {
                             return None
                         }
 
-                        info!("Successfully fetched {} game profiles", data.profiles.len());
+                        info!("Fetched {} game profiles successfully", data.profiles.len());
                         return Some(data.profiles)
                     }
                 }
@@ -103,34 +127,39 @@ impl SessionService {
                 Ok(txt) => match serde_json::from_str::<GameSession>(&txt) {
                     Err(err) => error!("Failed to create game session: {}", err),
                     Ok(session) => {
-                        info!("Successfully created game session");
+                        info!("Created game session successfully");
                         return Some(session)
                     }
                 }
             }
         }
-
         None
     }
-}
 
-#[derive(Deserialize)]
-struct AccountData {
-    profiles: Vec<GameProfile>
-}
+    pub async fn refresh_game_session(&self, session_token: &str) -> Option<GameSession> {
+        info!("Refreshing game session...");
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct GameProfile {
-    pub uuid: String,
-    pub username: String
-}
+        let response = self.client
+            .post(format!("{}/game-session/refresh", SESSION_SERVICE_URL))
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {session_token}"))
+            .header("User-Agent", format!("HytaleServer/{}", VERSION))
+            .send().await;
 
-#[derive(Deserialize, Debug)]
-pub struct GameSession {
-    #[serde(rename = "sessionToken")]
-    pub session_token: String,
-    #[serde(rename = "identityToken")]
-    pub identity_token: String,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: String
+        match response {
+            Err(err) => error!("Failed to refresh game session: {}", err),
+            Ok(resp) if resp.status() != 200 => error!("Failed to refresh game session, Http Code {}", resp.status()),
+            Ok(resp) => match resp.text().await {
+                Err(err) => error!("Failed to refresh game session: {}", err),
+                Ok(txt) => match serde_json::from_str::<GameSession>(&txt) {
+                    Err(err) => error!("Failed to refresh game session: {}", err),
+                    Ok(session) => {
+                        info!("Game session refreshed successfully");
+                        return Some(session)
+                    }
+                }
+            }
+        }
+        None
+    }
 }

@@ -1,6 +1,7 @@
 use crate::utils::io::codec::iso8601_duration;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use ahash::HashMap;
+use log::info;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use crate::plugin::plugin_identifier::PluginIdentifier;
@@ -58,8 +59,13 @@ impl Default for HytaleServerConfig {
 }
 
 pub fn load() -> HytaleServerConfig {
+    info!("Loading Config...");
+    let config_time = Instant::now();
+    
     let config = JsonConfig::load(CONFIG_PATH, true).expect("Failed to load server config");
     JsonConfig::save(CONFIG_PATH, &config, true);
+    
+    info!("Config Loaded in {:.2?}", config_time.elapsed());
     config
 }
 
