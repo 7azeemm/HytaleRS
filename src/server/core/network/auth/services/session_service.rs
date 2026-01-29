@@ -4,6 +4,8 @@ use jsonwebtoken::jwk::JwkSet;
 use log::{error, info};
 use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
+use url::form_urlencoded;
+use uuid::Uuid;
 use crate::server::core::hytale_server::VERSION;
 
 pub const SESSION_SERVICE_URL: &str = "https://sessions.hytale.com";
@@ -11,33 +13,14 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
 pub struct SessionService {
+    pub session_id: String,
     client: Client,
-}
-
-#[derive(Deserialize)]
-struct AccountData {
-    profiles: Vec<GameProfile>
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct GameProfile {
-    pub uuid: String,
-    pub username: String
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GameSession {
-    #[serde(rename = "sessionToken")]
-    pub session_token: String,
-    #[serde(rename = "identityToken")]
-    pub identity_token: String,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: String
 }
 
 impl SessionService {
     pub fn new() -> Self {
         Self {
+            session_id: Uuid::new_v4().to_string(),
             client: ClientBuilder::new()
                 .timeout(CONNECT_TIMEOUT)
                 .build()
@@ -162,4 +145,91 @@ impl SessionService {
         }
         None
     }
+
+    pub async fn request_auth_grant(&self, identity_token: &str, session_token: &str) -> Option<String> {
+        let response = self.client
+            .post(format!("{}/server-join/auth-grant", SESSION_SERVICE_URL))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {session_token}"))
+            .header("User-Agent", format!("HytaleServer/{}", VERSION))
+            .body(format!(r#"{{"identityToken": "{}", "aud": "{}"}}"#, identity_token, &self.session_id))
+            .send().await;
+
+        match response {
+            Err(err) => error!("Failed to request auth grant: {}", err),
+            Ok(resp) if resp.status() != 200 => error!("Failed to request auth grant, Http Code {}", resp.status()),
+            Ok(resp) => match resp.text().await {
+                Err(err) => error!("Failed to request auth grant: {}", err),
+                Ok(txt) => match serde_json::from_str::<AuthGrantResponse>(&txt) {
+                    Err(err) => error!("Failed to request auth grant: {}", err),
+                    Ok(auth_grant) => {
+                        info!("Obtained authorization grant successfully");
+                        return Some(auth_grant.auth_grant)
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub async fn exchange_auth_grant_for_token(&self, auth_grant: &str, cert: &str, session_token: &str) -> Option<String> {
+        let response = self.client
+            .post(format!("{}/server-join/auth-token", SESSION_SERVICE_URL))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {session_token}"))
+            .header("User-Agent", format!("HytaleServer/{}", VERSION))
+            .body(format!(r#"{{"authorizationGrant": "{}", "x509Fingerprint": "{}"}}"#, auth_grant, cert))
+            .send().await;
+
+        match response {
+            Err(err) => error!("Failed to exchange auth grant: {}", err),
+            Ok(resp) if resp.status() != 200 => error!("Failed to exchange auth grant, Http Code {}", resp.status()),
+            Ok(resp) => match resp.text().await {
+                Err(err) => error!("Failed to exchange auth grant: {}", err),
+                Ok(txt) => match serde_json::from_str::<AccessTokenResponse>(&txt) {
+                    Err(err) => error!("Failed to exchange auth grant: {}", err),
+                    Ok(resp) => {
+                        info!("Obtained access token successfully");
+                        return Some(resp.access_token)
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+#[derive(Deserialize)]
+struct AccountData {
+    profiles: Vec<GameProfile>
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GameProfile {
+    pub uuid: String,
+    pub username: String
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GameSession {
+    #[serde(rename = "sessionToken")]
+    pub session_token: String,
+    #[serde(rename = "identityToken")]
+    pub identity_token: String,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: String
+}
+
+#[derive(Deserialize)]
+struct AuthGrantResponse {
+    #[serde(rename = "authorizationGrant")]
+    auth_grant: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct AccessTokenResponse {
+    #[serde(rename = "accessToken")]
+    pub access_token: String
 }

@@ -42,6 +42,7 @@ dependencies = [
  "sha2",
  "strum",
  "strum_macros",
+ "subtle",
  "syn",
  "tokio",
  "url",

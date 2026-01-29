@@ -1,7 +1,7 @@
 use crate::server::core::network::packet::packet::Packet;
 
-pub mod connect;
-pub mod disconnect;
+pub mod connection;
+pub mod setup;
 
 pub fn test_packet<P: Packet>(packet: &P) -> P {
     let mut buf = Vec::new();
@@ -21,7 +21,7 @@ pub fn test_packet<P: Packet>(packet: &P) -> P {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::packets::disconnect::{Disconnect, DisconnectCause};
+    use crate::protocol::packets::connection::disconnect::{Disconnect, DisconnectCause};
     use crate::protocol::packets::test_packet;
 
     #[test]

@@ -26,7 +26,7 @@ pub enum ClientType {
     Editor
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HostAddress {
     pub host: String,
     pub port: i16

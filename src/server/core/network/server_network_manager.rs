@@ -34,7 +34,7 @@ const PORT: &str = "5520";
 
 pub struct ServerNetworkManager {
     pub endpoint: Endpoint,
-    pub(crate) server_certificate: Vec<CertificateDer<'static>>
+    pub(crate) server_certificate: CertificateDer<'static>
 }
 
 impl ServerNetworkManager {
@@ -138,10 +138,10 @@ async fn handle_connection(connecting: Connecting) {
     }
 }
 
-fn build_server_config(cert_chain: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> anyhow::Result<ServerConfig> {
+fn build_server_config(cert_chain: CertificateDer<'static>, key: PrivateKeyDer<'static>) -> anyhow::Result<ServerConfig> {
     let mut tls = rustls::ServerConfig::builder()
         .with_client_cert_verifier(Arc::new(ClientVerifier))
-        .with_single_cert(cert_chain, key)?;
+        .with_single_cert(vec![cert_chain], key)?;
 
     tls.alpn_protocols = PROTOCOLS.to_vec().iter().map(|b| b.to_vec()).collect();
 
@@ -170,9 +170,9 @@ fn build_transport_config() -> anyhow::Result<TransportConfig> {
     Ok(transport)
 }
 
-fn generate_self_signed_cert() -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), Box<dyn Error>> {
+fn generate_self_signed_cert() -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>), Box<dyn Error>> {
     let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()])?;
-    let cert_der = vec![cert.cert.der().to_owned()];
+    let cert_der = cert.cert.der().to_owned();
     let key_der = PrivateKeyDer::try_from(cert.signing_key.serialize_der())?;
     Ok((cert_der, key_der))
 }

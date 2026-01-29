@@ -15,9 +15,9 @@ pub enum HandlerAction {
 
 #[macro_export]
 macro_rules! handle_packet {
-    ($packet_type:ty, $data:expr, $handler:expr, $cx:expr) => {{
+    ($self:expr, $packet_type:ty, $data:expr, $method:ident, $cx:expr) => {{
         match $crate::server::core::network::packet::packet_decoder::PacketDecoder::decode::<$packet_type>($data) {
-            Some(packet) => $handler(packet, $cx).await,
+            Some(packet) => $self.$method(packet, $cx).await,
             None => $crate::server::core::network::packet::packet_handler::HandlerAction::Disconnect(
                 "Failed to decode packet".to_owned()
             ),

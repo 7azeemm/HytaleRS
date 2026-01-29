@@ -8,9 +8,8 @@ use log::{error, info};
 use once_cell::sync::OnceCell;
 use serde_json::Value;
 use tokio::sync::{Mutex, RwLock};
-use tokio::time::Instant;
+use tokio::time::{sleep, Instant};
 use uuid::Uuid;
-use crate::GLOBAL_SCHEDULER;
 use crate::server::core::network::auth::credential_store::{CredentialStore, AuthTokens};
 use crate::server::core::network::auth::jwt_validator::JWTValidator;
 use crate::server::core::network::auth::services::auth_service::AuthService;
@@ -31,7 +30,6 @@ static SERVER_AUTH_MANAGER: OnceCell<ServerAuthManager> = OnceCell::new();
 
 #[derive(Debug)]
 pub struct ServerAuthManager {
-    pub session_id: Uuid,
     pub session_service: Arc<SessionService>,
     pub auth_service: Arc<AuthService>,
     pub jwt_validator: Arc<JWTValidator>,
@@ -46,10 +44,9 @@ impl ServerAuthManager {
         let session_service = Arc::new(SessionService::new());
 
         SERVER_AUTH_MANAGER.set(Self {
-            session_id: Uuid::new_v4(),
             session_service: session_service.clone(),
             auth_service: Arc::new(AuthService::new()),
-            jwt_validator: JWTValidator::new(session_service).await,
+            jwt_validator: Arc::new(JWTValidator::new(session_service).await),
             credential_store: CredentialStore::new().await,
             profiles: Mutex::new(HashMap::default()),
             game_session: Mutex::new(None),
@@ -57,6 +54,7 @@ impl ServerAuthManager {
         }).unwrap();
 
         let instance = Self::get();
+        instance.jwt_validator.fetch_jwks();
         instance.credential_store.load().await;
         instance.auth().await;
     }
@@ -189,14 +187,13 @@ fn schedule_game_session_refresh(session: &GameSession, session_token: String) {
     info!("Scheduled token refresh in {:?}", duration);
 
     // Schedule a one-time refresh task
-    let _ = GLOBAL_SCHEDULER.schedule_once(duration, move || {
-        tokio::spawn(async move {
-            let manager = ServerAuthManager::get();
-            match manager.session_service.refresh_game_session(&session_token).await {
-                None => manager.set_auth_state(AuthState::Failed(AuthError::RefreshFailed)).await,
-                Some(game_session) => manager.on_new_game_session(game_session).await
-            }
-        });
+    tokio::spawn(async move {
+        sleep(duration).await;
+        let manager = ServerAuthManager::get();
+        match manager.session_service.refresh_game_session(&session_token).await {
+            None => manager.set_auth_state(AuthState::Failed(AuthError::RefreshFailed)).await,
+            Some(game_session) => manager.on_new_game_session(game_session).await
+        }
     });
 }
 

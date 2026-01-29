@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
 use rustls::pki_types::CertificateDer;
 use tokio::time::timeout;
-use crate::protocol::packets::disconnect::{Disconnect, DisconnectCause};
+use crate::protocol::packets::connection::disconnect::{Disconnect, DisconnectCause};
 use crate::server::core::hytale_server::HYTALE_SERVER;
 use crate::server::core::hytale_server_config::ConnectionTimeouts;
 pub(crate) use crate::server::core::network::packet::MAX_PACKET_SIZE;
@@ -105,8 +105,8 @@ pub struct ConnectionContext {
 }
 
 impl ConnectionContext {
-    pub async fn send<P: Packet>(&self, packet: &P) -> Option<()> {
-        let bytes = PacketEncoder::encode(packet)?;
+    pub async fn send<P: Packet>(&self, packet: P) -> Option<()> {
+        let bytes = PacketEncoder::encode(&packet)?;
         let mut writer = self.writer.lock().await;
         if let Err(err) = writer.write_all(&bytes).await {
             error!("Failed to write packet 0x{:02X}: {}", P::packet_id(), err);
@@ -119,7 +119,7 @@ impl ConnectionContext {
     // Todo: maybe can be non-async and spawns a tokio thread to send the packet
     pub async fn disconnect(&self, reason: &str) {
         info!("Disconnecting..., reason: {}", reason);
-        self.send(&Disconnect {
+        self.send(Disconnect {
             reason: Some(reason.to_owned()),
             cause: DisconnectCause::Disconnect
         }).await;
