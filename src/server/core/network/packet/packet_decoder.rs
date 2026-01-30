@@ -8,8 +8,8 @@ use crate::server::core::network::packet::packet::{Packet, PacketField};
 use crate::server::core::network::packet::packet_error::PacketError;
 
 pub struct PacketDecoder<'a> {
-    buf: &'a [u8],
-    pos: usize,
+    pub(crate) buf: &'a [u8],
+    pub(crate) pos: usize,
 }
 
 impl<'a> PacketDecoder<'a> {

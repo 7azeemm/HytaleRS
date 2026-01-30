@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
 use clap::{Parser, ValueEnum};
 use once_cell::sync::OnceCell;
 
-static OPTIONS: OnceCell<Arc<Options>> = OnceCell::new();
+static OPTIONS: OnceCell<Options> = OnceCell::new();
 
 //TODO: NO_LOGS option or check "log"
 
@@ -124,12 +123,14 @@ pub struct Options {
     // pub identity_token: Option<String>,
 }
 
-pub fn get() -> Arc<Options> {
-    OPTIONS.get().unwrap().clone()
+impl Options {
+    pub fn get() -> &'static Options {
+        OPTIONS.get().unwrap()
+    }
 }
 
 pub fn parse() {
-    OPTIONS.set(Arc::new(Options::parse())).expect("Failed to parse options");
+    OPTIONS.set(Options::parse()).expect("Failed to parse options");
 }
 
 fn parse_dir(path: &str) -> Result<PathBuf, String> {

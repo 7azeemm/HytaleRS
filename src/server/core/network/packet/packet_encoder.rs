@@ -6,6 +6,10 @@ use uuid::Uuid;
 use crate::server::core::network::connection_manager::MAX_PACKET_SIZE;
 use crate::server::core::network::packet::{MAX_STRING_LEN, MAX_VARINT};
 
+const COMPRESSED_PACKETS: &[u32] = &[
+    20, // WorldSettings
+];
+
 pub struct PacketEncoder<'a> {
     buf: &'a mut Vec<u8>,
 }
@@ -14,28 +18,64 @@ impl<'a> PacketEncoder<'a> {
     #[inline]
     pub fn encode<P: Packet>(packet: &P) -> Option<Vec<u8>> {
         let start_time = Instant::now();
-        let mut body_buf = Vec::with_capacity(512);
+        let packet_id = P::packet_id();
+        let is_compressed = COMPRESSED_PACKETS.contains(&packet_id);
 
-        if let Err(err) = packet.encode(&mut body_buf) {
+        // Encode packet payload first
+        let mut payload_buf = Vec::with_capacity(512);
+        if let Err(err) = packet.encode(&mut payload_buf) {
             error!("Failed to encode packet 0x{:02X}: {}", P::packet_id(), err);
             return None
         }
 
-        let packet_id = P::packet_id();
-        let payload_len = body_buf.len();
+        let mut out = Vec::with_capacity(8 + payload_buf.len());
 
-        if payload_len > MAX_PACKET_SIZE as usize {
-            error!("Packet payload {} exceeds max size {}", payload_len, MAX_PACKET_SIZE);
-            return None
-        }
-
-        let mut out = Vec::with_capacity(8 + payload_len);
-        out.extend_from_slice(&(payload_len as u32).to_le_bytes());
+        // Write frame header: [length placeholder][packet_id]
+        let length_index = out.len();
+        out.extend_from_slice(&[0u8; 4]); // Placeholder for length
         out.extend_from_slice(&packet_id.to_le_bytes());
-        out.extend_from_slice(&body_buf);
 
-        let end_time = start_time.elapsed();
-        info!("Encoded Packet 0x{:02X} in {:?}", packet_id, end_time);
+        if is_compressed && payload_buf.len() > 0 {
+            // Compress payload and write to output buffer
+            match zstd::encode_all(payload_buf.as_slice(), 0) {
+                Ok(compressed) => {
+                    let compressed_size = compressed.len();
+
+                    if compressed_size > MAX_PACKET_SIZE as usize {
+                        error!("Compressed packet payload {} exceeds max size {}", compressed_size, MAX_PACKET_SIZE);
+                        return None
+                    }
+
+                    // Write compressed data
+                    out.extend_from_slice(&compressed);
+
+                    // Update length field with compressed size
+                    out[length_index..length_index + 4].copy_from_slice(&(compressed_size as u32).to_le_bytes());
+
+                    info!("Encoded Packet 0x{:02X} (compressed) in {:?}: {} -> {} bytes",
+                          packet_id, start_time.elapsed(), payload_buf.len(), compressed_size);
+                }
+                Err(err) => {
+                    error!("Failed to compress packet 0x{:02X}: {}", packet_id, err);
+                    return None
+                }
+            }
+        } else {
+            let payload_size = payload_buf.len();
+
+            if payload_size > MAX_PACKET_SIZE as usize {
+                error!("Packet payload {} exceeds max size {}", payload_size, MAX_PACKET_SIZE);
+                return None
+            }
+
+            // Write uncompressed payload
+            out.extend_from_slice(&payload_buf);
+
+            // Update length field with uncompressed size
+            out[length_index..length_index + 4].copy_from_slice(&(payload_size as u32).to_le_bytes());
+
+            info!("Encoded Packet 0x{:02X} in {:?}", packet_id, start_time.elapsed());
+        }
 
         Some(out)
     }
@@ -377,7 +417,7 @@ impl<'a, 'b, const N: usize> OffsetReserver<'a, 'b, N> {
 }
 
 #[inline]
-fn write_varint(buf: &mut Vec<u8>, mut value: usize) -> Result<(), PacketError> {
+pub fn write_varint(buf: &mut Vec<u8>, mut value: usize) -> Result<(), PacketError> {
     if value > MAX_VARINT {
         return Err(PacketError::EncodeOverflow { field: "varint" });
     }
