@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
+use crate::server::core::assets::asset_type::AssetType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct BlockSet {
-    pub id: Option<String>,
-    pub name: Option<String>,
+    pub id: String,
     pub parent: Option<String>,
     pub include_all: bool,
     pub include_block_types: Vec<String>,
@@ -15,4 +15,26 @@ pub struct BlockSet {
     pub exclude_hitbox_types: Vec<String>,
     pub include_categories: Vec<Vec<String>>,
     pub exclude_categories: Vec<Vec<String>>
+}
+
+impl AssetType for BlockSet {
+    fn asset_type() -> &'static str {
+        "BlockSet"
+    }
+
+    fn store_path() -> &'static str {
+        "Item/Block/Sets"
+    }
+
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn set_id(&mut self, id: String) {
+        self.id = id;
+    }
+
+    fn parent(&self) -> Option<String> {
+        self.parent.clone()
+    }
 }

@@ -14,7 +14,8 @@ use crate::event::event_bus::{EventBus, EVENT_BUS};
 use crate::event::events::load_asset_event::LoadAssetEvent;
 use crate::server::core::{hytale_server_config, options};
 use crate::server::core::assets::asset_module::ASSET_MODULE;
-use crate::server::core::assets::asset_registry::AssetRegistry;
+use crate::server::core::assets::asset_registry::STORE_REGISTRY;
+use crate::server::core::assets::types::block_set::block_set::BlockSet;
 use crate::server::core::network::server_network_manager::ServerNetworkManager;
 
 pub static HYTALE_SERVER: LazyLock<Arc<HytaleServer>> = LazyLock::new(|| Arc::new(HytaleServer::new()));
@@ -53,8 +54,13 @@ impl HytaleServer {
         // the command manager and plugin manager setup in the original java code
         // ServerNetworkManager::init().await.expect("Failed to initialize Server Network Manager");
 
-        AssetRegistry::init();
+        // AssetRegistry::init();
+        STORE_REGISTRY.register::<BlockSet>();
         ASSET_MODULE.init().await;
+        
+        
+
+        // STORE_REGISTRY.print_summary();
 
 
         EVENT_BUS.dispatch(&LoadAssetEvent{});
