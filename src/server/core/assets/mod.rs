@@ -7,6 +7,7 @@ pub mod asset_store;
 pub mod types;
 mod asset_type;
 mod asset_reader;
+mod structs;
 
 #[derive(Debug, Clone)]
 pub enum AssetError {

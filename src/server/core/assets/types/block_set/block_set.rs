@@ -18,23 +18,23 @@ pub struct BlockSet {
 }
 
 impl AssetType for BlockSet {
-    fn asset_type() -> &'static str {
-        "BlockSet"
+    fn name() -> &'static str {
+        "BlockSets"
     }
 
-    fn store_path() -> &'static str {
+    fn path() -> &'static str {
         "Item/Block/Sets"
     }
 
-    fn id(&self) -> String {
-        self.id.clone()
+    fn id(&self) -> &str {
+        &self.id
     }
 
     fn set_id(&mut self, id: String) {
         self.id = id;
     }
 
-    fn parent(&self) -> Option<String> {
-        self.parent.clone()
+    fn parent(&self) -> Option<&str> {
+        self.parent.as_deref()
     }
 }

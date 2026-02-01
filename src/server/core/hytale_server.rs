@@ -63,7 +63,7 @@ impl HytaleServer {
         // STORE_REGISTRY.print_summary();
 
 
-        EVENT_BUS.dispatch(&LoadAssetEvent{});
+        EVENT_BUS.dispatch(&LoadAssetEvent{}).await;
 
         BOOTED.store(true, Ordering::Relaxed);
         info!("Server took {:.2?} to start", self.boot_start.elapsed());

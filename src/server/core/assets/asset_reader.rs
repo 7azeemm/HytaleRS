@@ -5,24 +5,19 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 use ahash::HashMap;
 use log::info;
+use parking_lot::Mutex;
 use zip::ZipArchive;
 use crate::server::core::assets::{AssetError, AssetResult};
 
 pub struct ZipReader {
-    zip: ZipArchive<File>,
+    zip: Mutex<ZipArchive<File>>,
     file_cache: HashMap<String, usize>,  // path -> index in ZIP
 }
 
 impl ZipReader {
     pub fn open<P: AsRef<Path>>(path: P, file_name: &str) -> AssetResult<Self> {
-        let start = Instant::now();
-
         let file = File::open(path.as_ref()).map_err(|e| AssetError::ZipError(e.to_string()))?;
         let mut zip = ZipArchive::new(file).map_err(|e| AssetError::ZipError(e.to_string()))?;
-
-        info!("Opened Asset Pack {} in {:.2?}", file_name, start.elapsed());
-
-        let start = Instant::now();
 
         // Build file cache
         let file_cache: HashMap<String, usize> = zip
@@ -32,38 +27,27 @@ impl ZipReader {
             .map(|(i, name)| (name.to_string(), i))
             .collect();
 
-        info!("Built file cache for {} in {:.2?}", file_name, start.elapsed());
         info!("Loaded {} json files from {}", file_cache.len(), file_name);
 
-        Ok(ZipReader { zip, file_cache })
+        Ok(ZipReader {
+            zip: Mutex::new(zip),
+            file_cache
+        })
     }
 
-    /// Get all JSON file paths
-    pub fn list_json_files(&self) -> Vec<String> {
-        self.file_cache.iter().map(|(path, _)| path.clone()).collect()
+    pub fn iter(&self, path: &str, extension: &str) -> impl Iterator<Item=&String> {
+        self.file_cache.keys().filter(move |file| file.starts_with(path) && file.ends_with(extension))
     }
 
-    /// Read a file by path
-    pub fn read_file(&mut self, path: &str) -> AssetResult<String> {
+    pub fn read_file(&self, path: &str) -> AssetResult<Vec<u8>> {
         if let Some(index) = self.file_cache.get(path) {
-            let mut file = self.zip.by_index(*index).map_err(|e| AssetError::ZipError(e.to_string()))?;
-            let mut content = String::new();
-            file.read_to_string(&mut content).map_err(|e| AssetError::IoError(e.to_string()))?;
+            let mut zip = self.zip.lock();
+            let mut file = zip.by_index(*index).map_err(|e| AssetError::ZipError(e.to_string()))?;
+            let mut content = Vec::new();
+            file.read_to_end(&mut content).map_err(|e| AssetError::IoError(e.to_string()))?;
             return Ok(content);
         }
 
         Err(AssetError::NotFound(format!("File not found: {}", path)))
-    }
-
-    /// Read multiple files in parallel
-    pub fn read_files_parallel(&mut self, paths: &[String]) -> Vec<(String, AssetResult<String>)> {
-        paths.iter()
-            .map(|path| (path.clone(), self.read_file(path)))
-            .collect()
-    }
-
-    /// Total file count
-    pub fn file_count(&self) -> usize {
-        self.file_cache.len()
     }
 }
