@@ -72,6 +72,15 @@ impl Display for PacketError {
 
 impl Error for PacketError {}
 
+impl From<std::io::Error> for PacketError {
+    fn from(err: std::io::Error) -> Self {
+        PacketError::Error {
+            reason: "Error",
+            error: err.to_string(),
+        }
+    }
+}
+
 impl<T: Debug + num_enum::TryFromPrimitive<Primitive = u8>> From<TryFromPrimitiveError<T>> for PacketError {
     fn from(err: TryFromPrimitiveError<T>) -> Self {
         PacketError::DecodeInvalidPrimitiveValue {

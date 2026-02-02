@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use log::info;
 use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
 use crate::handle_packet;
@@ -48,8 +49,6 @@ impl PacketHandler for SetupHandler {
 impl SetupHandler {
     async fn handle_request_assets(&self, packet: RequestAssets, cx: &mut ConnectionContext) -> HandlerAction {
         info!("Client requested {} assets", packet.assets.len());
-
-        info!("{:#?}", packet.assets.first());
 
         cx.send(WorldLoadProgress {
             status: "Loading World".to_owned(),

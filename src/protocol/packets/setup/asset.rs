@@ -91,33 +91,8 @@ impl PacketField for Asset {
             .to_string();
 
         // Read varint-prefixed name after the hash
-        let name_pos = offset + ASSET_HASH_LEN;
-
-        if name_pos >= buf.len() {
-            return Err(PacketError::DecodeEOF { field: "asset_name_length" });
-        }
-
-        // Read varint length - returns (name_len, pos_after_varint)
-        let (name_len, pos_after_varint) = read_varint_at(buf, name_pos, "asset_name_length")?;
-
-        if name_len > MAX_ASSET_NAME_LEN {
-            return Err(PacketError::EncodeStringTooLong {
-                field: "asset_name",
-                len: name_len,
-                max: MAX_ASSET_NAME_LEN,
-            });
-        }
-
-        // Read the actual name string
-        let name_start = pos_after_varint;  // ✅ Use the position AFTER varint
-        let name_end = name_start + name_len;
-
-        if name_end > buf.len() {
-            return Err(PacketError::DecodeEOF { field: "asset_name" });
-        }
-
-        let name = String::from_utf8(buf[name_start..name_end].to_vec())
-            .map_err(|_| PacketError::DecodeInvalidUtf8 { field: "asset_name" })?;
+        let name_offset = (offset + ASSET_HASH_LEN) as i32;
+        let name = dec.read_var_string(name_offset, "asset_name")?;
 
         Ok(Self { hash, name })
     }

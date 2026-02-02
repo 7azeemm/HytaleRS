@@ -18,16 +18,11 @@ impl Packet for WorldSettings {
     fn encode(&self, writer: &mut Vec<u8>) -> Result<(), PacketError> {
         let mut enc = PacketEncoder::new(writer);
 
-        // Null bits: bit 0 = required_assets present
         let null_bits = if self.required_assets.is_empty() { 0u8 } else { 1u8 };
         enc.write_null_bits(null_bits);
-
-        // World height
         enc.write_i32(self.world_height);
 
-        // Required assets
         if !self.required_assets.is_empty() {
-            enc.write_var_u32(self.required_assets.len() as u32);
             write_varint(writer, self.required_assets.len())?;
             for asset in &self.required_assets {
                 asset.encode(writer)?;

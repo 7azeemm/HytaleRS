@@ -19,24 +19,22 @@ impl<'a> PacketEncoder<'a> {
         let is_compressed = COMPRESSED_PACKETS.contains(&packet_id);
 
         // Encode payload
-        let mut payload_buf = Vec::with_capacity(512);
-        if let Err(err) = packet.encode(&mut payload_buf) {
+        let mut payload = Vec::with_capacity(512);
+        if let Err(err) = packet.encode(&mut payload) {
             error!("Failed to encode packet {}: {}", packet_id, err);
             return None;
         }
 
         // Compress payload if needed and not empty
-        let payload = if is_compressed && !payload_buf.is_empty() {
-            match zstd::bulk::compress(&payload_buf, 3) {
+        if is_compressed && !payload.is_empty() {
+            payload = match zstd::bulk::compress(&payload, 3) {
                 Ok(compressed) => compressed,
                 Err(err) => {
                     error!("Failed to compress packet {}: {}", packet_id, err);
                     return None;
                 }
             }
-        } else {
-            payload_buf
-        };
+        }
 
         // Prepare final packet buffer: [length][packet_id][payload]
         let mut out = Vec::with_capacity(8 + payload.len());

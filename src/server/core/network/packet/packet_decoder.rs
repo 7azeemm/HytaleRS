@@ -1,5 +1,6 @@
 use log::{debug, error, info};
 use quinn::{ReadError, ReadExactError, RecvStream};
+use tokio::io::AsyncReadExt;
 use tokio::time::Instant;
 use uuid::Uuid;
 use crate::server::core::network::connection_manager::MAX_PACKET_SIZE;
@@ -447,62 +448,42 @@ pub fn read_varint_at(buf: &[u8], mut pos: usize, field: &'static str) -> Result
 }
 
 /// Read framed packet from stream
-/// Returns: (packet_id, body_bytes)
 pub async fn read_framed_packet(recv: &mut RecvStream) -> Result<(u32, Vec<u8>), PacketError> {
-    let mut header = [0u8; 8];
-
-    recv.read_exact(&mut header).await.map_err(|err| map_read_error(err))?;
-
-    let payload_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
-    let packet_id = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
+    let payload_len = recv.read_i32_le().await? as u32;
+    let packet_id = recv.read_i32_le().await? as u32;
+    info!("Packet {}, Payload Length: {}", packet_id, payload_len);
 
     if payload_len > MAX_PACKET_SIZE {
         return Err(PacketError::DecodeInvalidPayloadLength {
             size: payload_len,
-            min: 1,
+            min: 0,
             max: MAX_PACKET_SIZE
         })
     }
 
-    let payload_len = payload_len as usize;
-    let is_compressed = COMPRESSED_PACKETS.contains(&packet_id);
+    if payload_len == 0 {
+        return Ok((packet_id, Vec::new()))
+    }
 
-    let payload = if payload_len > 0 {
-        let mut compressed_payload = vec![0u8; payload_len];
-        recv.read_exact(&mut compressed_payload).await.map_err(|err| map_read_error(err))?;
+    let mut payload = vec![0u8; payload_len as usize];
+    recv.read_exact(&mut payload).await.map_err(|err| map_read_error(err))?;
 
-        if is_compressed {
-            decompress_payload(&compressed_payload, packet_id)?
-        } else {
-            compressed_payload
-        }
-    } else {
-        Vec::new()
-    };
+    if COMPRESSED_PACKETS.contains(&packet_id) {
+        payload = decompress_payload(&payload, packet_id)?;
+    }
 
     Ok((packet_id, payload))
 }
 
 fn decompress_payload(compressed: &[u8], packet_id: u32) -> Result<Vec<u8>, PacketError> {
-    info!("Decompressing packet {}: compressed_size = {}", packet_id, compressed.len());
-
     let mut decompressed = Vec::new();
-
     let mut reader = std::io::Cursor::new(compressed);
+
     zstd::stream::copy_decode(&mut reader, &mut decompressed)
         .map_err(|e| PacketError::Error {
             reason: "Zstd decompression failed",
             error: format!("{}: {}", e, packet_id),
         })?;
-
-    info!("Decompressed packet {}: decompressed_size = {}", packet_id, decompressed.len());
-
-    if decompressed.is_empty() {
-        return Err(PacketError::Error {
-            reason: "Decompressed data is empty",
-            error: format!("Packet {}", packet_id),
-        });
-    }
 
     Ok(decompressed)
 }
