@@ -2,13 +2,13 @@ use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
 use crate::event::event_bus::EVENT_BUS;
 use crate::event::events::load_asset_event::LoadAssetEvent;
-use crate::server::core::assets::asset_pack::AssetPack;
+use crate::assets::asset_pack::AssetPack;
 use crate::server::core::options::Options;
 
 pub static ASSET_MODULE: LazyLock<AssetModule> = LazyLock::new(|| AssetModule::new());
 
 pub struct AssetModule {
-    asset_packs: RwLock<Vec<AssetPack>>
+    pub(crate) asset_packs: RwLock<Vec<AssetPack>>
 }
 
 impl AssetModule {
@@ -31,7 +31,7 @@ impl AssetModule {
         }
 
         EVENT_BUS.on_async(None, |event: &LoadAssetEvent| async {
-            // PreLoadAssets
+            // TODO: PreLoadAssets
         
             // Load Assets
             for pack in ASSET_MODULE.asset_packs.read().await.iter() {

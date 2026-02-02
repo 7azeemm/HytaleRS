@@ -1,11 +1,11 @@
 use std::io::Write;
 use crate::server::core::network::packet::packet::PacketField;
 use crate::server::core::network::packet::packet_error::PacketError;
-use crate::server::core::network::packet::packet_decoder::PacketDecoder;
+use crate::server::core::network::packet::packet_decoder::{read_varint_at, PacketDecoder};
 use crate::server::core::network::packet::packet_encoder::{write_varint, PacketEncoder};
 
-const ASSET_HASH_LEN: usize = 64;
-const MAX_ASSET_NAME_LEN: usize = 512;
+pub const ASSET_HASH_LEN: usize = 64;
+pub const MAX_ASSET_NAME_LEN: usize = 512;
 
 #[derive(Debug, Clone)]
 pub struct Asset {
@@ -71,7 +71,54 @@ impl PacketField for Asset {
         Ok(())
     }
 
-    fn decode(_dec: &mut PacketDecoder, _offset: i32) -> Result<Self, PacketError> {
-        unimplemented!("Asset is send-only")
+    fn decode(dec: &mut PacketDecoder, offset: i32) -> Result<Self, PacketError> {
+        if offset < 0 {
+            return Err(PacketError::DecodeNegativeOffset { field: "asset", offset });
+        }
+
+        let offset = offset as usize;
+        let buf = dec.buf;
+
+        // Read fixed 64-byte hash
+        if offset + ASSET_HASH_LEN > buf.len() {
+            return Err(PacketError::DecodeEOF { field: "asset_hash" });
+        }
+
+        let hash_bytes = &buf[offset..offset + ASSET_HASH_LEN];
+        let hash = String::from_utf8(hash_bytes.to_vec())
+            .map_err(|_| PacketError::DecodeInvalidUtf8 { field: "asset_hash" })?
+            .trim_end_matches('\0')
+            .to_string();
+
+        // Read varint-prefixed name after the hash
+        let name_pos = offset + ASSET_HASH_LEN;
+
+        if name_pos >= buf.len() {
+            return Err(PacketError::DecodeEOF { field: "asset_name_length" });
+        }
+
+        // Read varint length - returns (name_len, pos_after_varint)
+        let (name_len, pos_after_varint) = read_varint_at(buf, name_pos, "asset_name_length")?;
+
+        if name_len > MAX_ASSET_NAME_LEN {
+            return Err(PacketError::EncodeStringTooLong {
+                field: "asset_name",
+                len: name_len,
+                max: MAX_ASSET_NAME_LEN,
+            });
+        }
+
+        // Read the actual name string
+        let name_start = pos_after_varint;  // ✅ Use the position AFTER varint
+        let name_end = name_start + name_len;
+
+        if name_end > buf.len() {
+            return Err(PacketError::DecodeEOF { field: "asset_name" });
+        }
+
+        let name = String::from_utf8(buf[name_start..name_end].to_vec())
+            .map_err(|_| PacketError::DecodeInvalidUtf8 { field: "asset_name" })?;
+
+        Ok(Self { hash, name })
     }
 }

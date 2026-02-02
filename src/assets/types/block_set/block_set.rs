@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::server::core::assets::asset_type::AssetType;
+use crate::assets::asset_type::AssetType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]

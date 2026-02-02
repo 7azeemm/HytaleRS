@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use log::{info, warn};
 use parking_lot::RwLock;
-use crate::server::core::assets::asset_type::AssetType;
-use crate::server::core::assets::{AssetError, AssetResult};
-use crate::server::core::assets::asset_store::{AssetStore, StoreBase};
+use crate::assets::asset_type::AssetType;
+use crate::assets::{AssetError, AssetResult};
+use crate::assets::asset_store::{AssetStore, StoreBase};
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
 

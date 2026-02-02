@@ -12,6 +12,7 @@ const VERSION: u32 = 3;
 const DEFAULT_SERVER_NAME: &str = "HytaleRS Server";
 const DEFAULT_MAX_PLAYERS: u32 = 100;
 const DEFAULT_MAX_VIEW_RADIUS: u32 = 32;
+pub const WORLD_HEIGHT: i32 = 320;
 
 // NOTE: All structs in config should have #[serde(default)]
 

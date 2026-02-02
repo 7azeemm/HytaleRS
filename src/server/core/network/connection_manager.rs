@@ -65,7 +65,7 @@ impl Connection {
                         break;
                     }
 
-                    info!("Received Packet 0x{:02X} from {}", packet_id, self.address);
+                    info!("Received Packet {} from {}", packet_id, self.address);
 
                     // Handle packet
                     match self.handler.handle(packet_id, &body, &mut self.context).await {
@@ -109,10 +109,10 @@ impl ConnectionContext {
         let bytes = PacketEncoder::encode(&packet)?;
         let mut writer = self.writer.lock().await;
         if let Err(err) = writer.write_all(&bytes).await {
-            error!("Failed to write packet 0x{:02X}: {}", P::packet_id(), err);
+            error!("Failed to write packet {}: {}", P::packet_id(), err);
             return None
         }
-        info!("Sent Packet 0x{:02X}", P::packet_id());
+        info!("Sent Packet {}", P::packet_id());
         Some(())
     }
 

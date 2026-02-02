@@ -17,8 +17,8 @@ impl PacketHandler for InitialPacketHandler {
     async fn handle(&mut self, packet_id: u32, data: &[u8], cx: &mut ConnectionContext) -> HandlerAction {
         cx.clear_timeout().await;
         match packet_id {
-            0x00 => handle_packet!(self, Connect, data, handle_connect, cx),
-            _ => HandlerAction::Error(format!("Unexpected packet 0x{:02X} in Handshake", packet_id)),
+            0 => handle_packet!(self, Connect, data, handle_connect, cx),
+            _ => HandlerAction::Error(format!("Unexpected packet {} in Handshake", packet_id)),
         }
     }
 

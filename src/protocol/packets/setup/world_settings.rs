@@ -1,12 +1,13 @@
+use std::sync::Arc;
 use crate::server::core::network::packet::packet::{Packet, PacketField};
 use crate::server::core::network::packet::packet_error::PacketError;
-use crate::server::core::network::packet::packet_encoder::PacketEncoder;
+use crate::server::core::network::packet::packet_encoder::{write_varint, PacketEncoder};
 use crate::protocol::packets::setup::asset::Asset;
 
 #[derive(Debug)]
 pub struct WorldSettings {
     pub world_height: i32,
-    pub required_assets: Vec<Asset>,
+    pub required_assets: Vec<Arc<Asset>>,
 }
 
 impl Packet for WorldSettings {
@@ -27,6 +28,7 @@ impl Packet for WorldSettings {
         // Required assets
         if !self.required_assets.is_empty() {
             enc.write_var_u32(self.required_assets.len() as u32);
+            write_varint(writer, self.required_assets.len())?;
             for asset in &self.required_assets {
                 asset.encode(writer)?;
             }

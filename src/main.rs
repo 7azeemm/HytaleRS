@@ -15,6 +15,7 @@ mod event;
 mod utils;
 mod plugin;
 mod protocol;
+pub mod assets;
 
 #[tokio::main]
 async fn main() {

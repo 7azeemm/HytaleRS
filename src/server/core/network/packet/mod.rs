@@ -8,3 +8,9 @@ pub const MAX_PACKET_SIZE: u32 = 262_144; // 256 KB
 pub const MAX_STRING_LEN: usize = 65536; // 64 KB
 pub const MAX_VARINT_ITERATIONS: usize = 5;  // Max 5 bytes for 32-bit varint
 pub const MAX_VARINT: usize = (1 << 28) - 1;
+pub const MAX_DECOMPRESSED_SIZE: usize = 1_048_576;
+
+pub const COMPRESSED_PACKETS: &[u32] = &[
+    20, // WorldSettings
+    23, // RequestAssets
+];

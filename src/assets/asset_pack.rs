@@ -6,15 +6,18 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
-use log::{error, info};
+use log::{error, info, warn};
 use zip::ZipArchive;
 use crate::plugin::plugin_manifest::PluginManifest;
-use crate::server::core::assets::asset_reader::ZipReader;
-use crate::server::core::assets::{AssetError, AssetResult};
-use crate::server::core::assets::asset_registry::STORE_REGISTRY;
-use crate::server::core::assets::asset_store::StoreBase;
+use crate::assets::asset_reader::ZipReader;
+use crate::assets::{AssetError, AssetResult};
+use crate::assets::asset_registry::STORE_REGISTRY;
+use crate::assets::asset_store::StoreBase;
+use crate::assets::common::common_asset::FileCommonAsset;
+use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
 
 pub struct AssetPack {
     name: String,
@@ -58,8 +61,58 @@ impl AssetPack {
 
         for store in stores {
             info!("Loading Assets from {}", self.name);
-            store.load_assets(&self.reader).await;
+            store.load_assets(&self.reader, &self.name).await;
         }
+    }
+
+    pub async fn load_common_assets_index_hashes(&self) {
+        let start = Instant::now();
+
+        // Try to read hashes file
+        let content = match self.reader.read_file("CommonAssetsIndex.hashes")
+            .and_then(|b| str::from_utf8(&b)
+                .map(|s| s.to_string())
+                .map_err(|err| AssetError::IoError(err.to_string()))) {
+            Ok(s) => s,
+            Err(err) => {
+                log::error!("Failed to read CommonAssetsIndex.hashes in pack '{}': {}", self.name, err);
+                return;
+            }
+        };
+
+        let mut loaded_count = 0;
+
+        for (line_number, line) in content.lines().enumerate() {
+            let mut split = line.splitn(2, ' ');
+            let hash = match split.next() {
+                Some(h) if h.len() == 64 => h,
+                _ => {
+                    warn!("Corrupt line in CommonAssetsIndex.hashes:L{} '{}'", line_number, line);
+                    continue;
+                }
+            };
+
+            let name = match split.next() {
+                Some(n) => n,
+                None => {
+                    warn!("Corrupt line in CommonAssetsIndex.hashes:L{} '{}'", line_number, line);
+                    continue;
+                }
+            };
+
+            let asset = FileCommonAsset {
+                name: name.to_owned(),
+                hash: hash.to_owned(),
+                path: format!("Common/{}", name),
+                pack: self.name.clone()
+            };
+
+            COMMON_ASSET_REGISTRY.add_common_asset(asset);
+
+            loaded_count += 1;
+        }
+
+        info!("Took {:.2?} to load {} assets from CommonAssetsIndex.hashes file.", start.elapsed(), loaded_count);
     }
 }
 

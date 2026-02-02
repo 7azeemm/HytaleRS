@@ -34,7 +34,7 @@ pub struct HostAddress {
 
 impl Packet for Connect {
     fn packet_id() -> u32 {
-        0x00
+        0
     }
 
     fn encode(&self, _writer: &mut Vec<u8>) -> Result<(), PacketError> {

@@ -24,7 +24,7 @@ impl PacketHandler for HandshakePacketHandler {
     async fn handle(&mut self, packet_id: u32, data: &[u8], cx: &mut ConnectionContext) -> HandlerAction {
         match packet_id {
             12 => handle_packet!(self, AuthToken, data, handle_auth_token, cx),
-            _ => HandlerAction::Error(format!("Unexpected packet 0x{:02X} in Handshake", packet_id)),
+            _ => HandlerAction::Error(format!("Unexpected packet {} in Handshake", packet_id)),
         }
     }
 

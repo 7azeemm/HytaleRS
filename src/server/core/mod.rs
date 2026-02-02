@@ -4,4 +4,3 @@ pub mod plugin;
 pub mod command;
 pub mod options;
 pub mod network;
-pub mod assets;

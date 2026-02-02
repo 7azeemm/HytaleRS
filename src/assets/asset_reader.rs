@@ -7,7 +7,7 @@ use ahash::HashMap;
 use log::info;
 use parking_lot::Mutex;
 use zip::ZipArchive;
-use crate::server::core::assets::{AssetError, AssetResult};
+use crate::assets::{AssetError, AssetResult};
 
 pub struct ZipReader {
     zip: Mutex<ZipArchive<File>>,
@@ -23,11 +23,11 @@ impl ZipReader {
         let file_cache: HashMap<String, usize> = zip
             .file_names()
             .enumerate()
-            .filter(|(_, name)| name.ends_with(".json") && !name.ends_with("/"))
+            .filter(|(_, name)| !name.ends_with("/"))
             .map(|(i, name)| (name.to_string(), i))
             .collect();
 
-        info!("Loaded {} json files from {}", file_cache.len(), file_name);
+        info!("Loaded {} files from {}", file_cache.len(), file_name);
 
         Ok(ZipReader {
             zip: Mutex::new(zip),

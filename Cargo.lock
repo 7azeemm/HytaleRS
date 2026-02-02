@@ -12,6 +12,7 @@ dependencies = [
  "async-trait",
  "base64",
  "bson",
+ "bytes",
  "chrono",
  "clap",
  "colored",

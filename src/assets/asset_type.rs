@@ -1,7 +1,8 @@
 use std::any::TypeId;
+use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
-pub trait AssetType: Serialize + for<'de> Deserialize<'de> + Send + Sync + Sized + Clone + 'static {
+pub trait AssetType: Serialize + for<'de> Deserialize<'de> + Send + Sync + Sized + Clone + Debug + 'static {
     fn name() -> &'static str;
     fn path() -> &'static str;
     fn id(&self) -> &str;
@@ -11,7 +12,7 @@ pub trait AssetType: Serialize + for<'de> Deserialize<'de> + Send + Sync + Sized
     fn extension() -> &'static str { ".json" }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Asset<T: AssetType> {
     pub data: T,
     pub from_pack: String,
@@ -19,11 +20,7 @@ pub struct Asset<T: AssetType> {
 }
 
 impl<T: AssetType> Asset<T> {
-    pub fn new(asset: T, from_pack: &str, from_path: &str) -> Self {
-        Self {
-            data: asset,
-            from_pack: from_pack.to_string(),
-            from_path: from_path.to_string(),
-        }
+    pub fn new(data: T, from_pack: String, from_path: String) -> Self {
+        Self { data, from_pack, from_path }
     }
 }

@@ -1,3 +1,4 @@
+use log::info;
 use crate::server::core::network::packet::packet::Packet;
 
 pub mod connection;
@@ -6,16 +7,16 @@ pub mod setup;
 pub fn test_packet<P: Packet>(packet: &P) -> P {
     let mut buf = Vec::new();
     match packet.encode(&mut buf) {
-        Ok(_) => println!("✓ Encoded 0x{:02X} ({} bytes)", P::packet_id(), buf.len()),
-        Err(e) => panic!("Failed to encode 0x{:02X}: {:?}", P::packet_id(), e)
+        Ok(_) => println!("✓ Encoded Packet {} ({} bytes)", P::packet_id(), buf.len()),
+        Err(e) => panic!("Failed to encode packet {}: {:?}", P::packet_id(), e)
     }
 
     match P::decode(&buf) {
         Ok(decoded) => {
-            println!("✓ Decoded 0x{:02X}", P::packet_id());
+            info!("✓ Decoded Packet {}", P::packet_id());
             decoded
         }
-        Err(e) => panic!("Failed to decode 0x{:02X}: {:?}", P::packet_id(), e)
+        Err(e) => panic!("Failed to decode packet {}: {:?}", P::packet_id(), e)
     }
 }
 
