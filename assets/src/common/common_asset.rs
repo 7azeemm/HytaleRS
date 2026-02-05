@@ -11,7 +11,7 @@ impl FileCommonAsset {
     pub fn to_packet(&self) -> Asset {
         Asset {
             name: self.name.clone().into(),
-            hash: self.hash.clone(),
+            hash: self.hash.clone().into(),
         }
     }
 }

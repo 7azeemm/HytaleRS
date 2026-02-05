@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use macros::packet_field;
-use crate::io::codecs::{VarList, VarString};
+use crate::io::codecs::{FixedAsciiString, VarList, VarString};
 
 packet! {
     id: 20,
@@ -13,7 +13,7 @@ packet! {
 
 #[packet_field]
 pub struct Asset {
-    pub hash: String,
+    pub hash: FixedAsciiString<64>,
     pub name: VarString<512>,
 }
 

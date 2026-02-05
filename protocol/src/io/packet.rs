@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::sync::LazyLock;
-use log::info;
 use crate::io::codecs::PacketCodec;
 use crate::io::decoder::Decoder;
 use crate::io::encoder::Encoder;
@@ -29,7 +28,7 @@ pub trait Packet: PacketCodec + Debug {
     const MAX_SIZE: u32;
 
     fn encode(&self) -> PacketResult<Vec<u8>> {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(&Self::METADATA);
         <Self as PacketCodec>::encode(&self, &mut encoder)?;
         Ok(encoder.finish())
     }

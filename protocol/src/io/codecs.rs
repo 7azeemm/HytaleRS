@@ -14,6 +14,7 @@ pub trait PacketCodec: Sized {
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()>;
     fn decode(dec: &mut Decoder) -> PacketResult<Self>;
+    fn has_value(&self) -> bool { true }
 }
 
 impl PacketCodec for u8 {
@@ -198,110 +199,6 @@ impl PacketCodec for Uuid {
     }
 }
 
-#[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct VarList<T, const MAX: usize>(pub Vec<T>);
-
-impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
-    const SIZE: Option<usize> = None;
-
-    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
-        let len = self.0.len();
-        if len > MAX {
-            return Err(PacketError::EncodeError(
-                format!("VarList length {} exceeds maximum of {} while encoding", len, MAX)
-            ));
-        }
-
-        enc.write_varint(len)?;
-        for item in &self.0 {
-            item.encode(enc)?;
-        }
-        Ok(())
-    }
-
-    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        let len = dec.read_varint()?;
-        if len < 0 {
-            return Err(PacketError::DecodeError(
-                format!("VarList length {} is negative while decoding", len)
-            ));
-        }
-
-        if len > MAX {
-            return Err(PacketError::DecodeError(
-                format!("VarList length {} exceeds maximum of {} while decoding", len, MAX)
-            ));
-        }
-
-        let mut items = Vec::with_capacity(len);
-        for _ in 0..len {
-            items.push(T::decode(dec)?);
-        }
-        Ok(Self(items))
-    }
-}
-
-impl<T, const MAX: usize> Deref for VarList<T, MAX> {
-    type Target = Vec<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T, const MAX: usize> DerefMut for VarList<T, MAX> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T, const MAX: usize> From<Vec<T>> for VarList<T, MAX> {
-    fn from(v: Vec<T>) -> Self {
-        Self(v)
-    }
-}
-
-impl<T, const MAX: usize> From<VarList<T, MAX>> for Vec<T> {
-    fn from(v: VarList<T, MAX>) -> Self {
-        v.0
-    }
-}
-
-impl<T, const MAX: usize> AsRef<[T]> for VarList<T, MAX> {
-    fn as_ref(&self) -> &[T] {
-        &self.0
-    }
-}
-
-impl<T: fmt::Debug, const MAX: usize> fmt::Display for VarList<T, MAX> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl<T: PacketCodec> PacketCodec for Vec<T> {
-    const SIZE: Option<usize> = None;
-
-    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
-        let len = self.len();
-        enc.write_varint(len)?;
-        for item in self {
-            item.encode(enc)?;
-        }
-        Ok(())
-    }
-
-    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        let len = dec.read_varint()?;
-        let mut items = Vec::with_capacity(len);
-        for _ in 0..len {
-            items.push(T::decode(dec)?);
-        }
-        Ok(items)
-    }
-}
-
 impl PacketCodec for String {
     const SIZE: Option<usize> = None;
 
@@ -481,33 +378,153 @@ impl<const N: usize> fmt::Display for FixedAsciiString<N> {
     }
 }
 
-impl<T: PacketCodec> PacketCodec for Option<T> {
-    const SIZE: Option<usize> = T::SIZE;
+impl<T: PacketCodec> PacketCodec for Vec<T> {
+    const SIZE: Option<usize> = None;
     const IS_OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
-        enc.add_null_bit(self.is_some());
+        let len = self.len();
+        if len > 0 {
+            enc.write_varint(len)?;
+            for item in self {
+                item.encode(enc)?;
+            }
+        }
+        Ok(())
+    }
 
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        if !dec.current_null_value() {
+            return Ok(Vec::new())
+        }
+        
+        let len = dec.read_varint()?;
+        let mut items = Vec::with_capacity(len);
+        for _ in 0..len {
+            items.push(T::decode(dec)?);
+        }
+        Ok(items)
+    }
+
+    fn has_value(&self) -> bool {
+        !self.is_empty()
+    }
+}
+
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct VarList<T, const MAX: usize>(pub Vec<T>);
+
+impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
+    const SIZE: Option<usize> = None;
+    const IS_OPTIONAL: bool = true;
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        let len = self.0.len();
+        if len > 0 {
+            if len > MAX {
+                return Err(PacketError::EncodeError(
+                    format!("VarList length {} exceeds maximum of {} while encoding", len, MAX)
+                ));
+            }
+            
+            enc.write_varint(len)?;
+            for item in &self.0 {
+                item.encode(enc)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        if !dec.current_null_value() {
+            return Ok(Self(Vec::new()))
+        }
+
+        let len = dec.read_varint()?;
+        if len < 0 {
+            return Err(PacketError::DecodeError(
+                format!("VarList length {} is negative while decoding", len)
+            ));
+        }
+
+        if len > MAX {
+            return Err(PacketError::DecodeError(
+                format!("VarList length {} exceeds maximum of {} while decoding", len, MAX)
+            ));
+        }
+
+        let mut items = Vec::with_capacity(len);
+        for _ in 0..len {
+            items.push(T::decode(dec)?);
+        }
+        Ok(Self(items))
+    }
+
+    fn has_value(&self) -> bool {
+        !self.is_empty()
+    }
+}
+
+impl<T, const MAX: usize> Deref for VarList<T, MAX> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T, const MAX: usize> DerefMut for VarList<T, MAX> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T, const MAX: usize> From<Vec<T>> for VarList<T, MAX> {
+    fn from(v: Vec<T>) -> Self {
+        Self(v)
+    }
+}
+
+impl<T, const MAX: usize> From<VarList<T, MAX>> for Vec<T> {
+    fn from(v: VarList<T, MAX>) -> Self {
+        v.0
+    }
+}
+
+impl<T, const MAX: usize> AsRef<[T]> for VarList<T, MAX> {
+    fn as_ref(&self) -> &[T] {
+        &self.0
+    }
+}
+
+impl<T: fmt::Debug, const MAX: usize> fmt::Display for VarList<T, MAX> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl<T: PacketCodec> PacketCodec for Option<T> {
+    const SIZE: Option<usize> = None;
+    const IS_OPTIONAL: bool = true;
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         match self {
             Some(v) => v.encode(enc),
-            None => {
-                if enc.in_fixed_block {
-                    let size = T::SIZE.expect("Option<T> requires SIZE in fixed block");
-                    enc.write_zeros(size);
-                } else {
-                    enc.edit_last_offset(-1)?;
-                }
-                Ok(())
-            }
+            None => Ok(())
         }
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if dec.read_null_bit() {
+        if dec.current_null_value() {
             T::decode(dec).map(Some)
         } else {
             Ok(None)
         }
+    }
+
+    fn has_value(&self) -> bool {
+        self.is_some()
     }
 }
 

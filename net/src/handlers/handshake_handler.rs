@@ -21,7 +21,7 @@ pub struct PlayerAuthentication {
     pub uuid: Uuid,
     pub username: String,
     pub language: String,
-    pub referral_data: Option<Vec<u8>>,
+    pub referral_data: Vec<u8>,
     pub referral_source: Option<HostAddress>,
 }
 
@@ -160,7 +160,7 @@ impl HandshakePacketHandler {
         info!("Sending server auth token to {}", &self.connect.username);
         cx.send(ServerAuthToken {
             access_token: Some(access_token.into()),
-            password_challenge: Some(Vec::new().into())
+            password_challenge: Vec::new().into()
         }).await;
         
         self.complete_auth(cx).await
@@ -176,7 +176,7 @@ impl HandshakePacketHandler {
                 uuid: self.connect.uuid,
                 username: (*self.connect.username).clone(),
                 language: (*self.connect.language).clone(),
-                referral_data: self.connect.referral_data.clone().map(VarList::into),
+                referral_data: (*self.connect.referral_data).clone(),
                 referral_source: self.connect.referral_source.clone()
             }
         }))

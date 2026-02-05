@@ -41,7 +41,7 @@ fn packet_enum_impl(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
             const SIZE: Option<usize> = Some(1);
 
             fn encode(&self, enc: &mut crate::io::encoder::Encoder) -> crate::io::errors::PacketResult<()> {
-                enc.write_bytes(&[*self as u8]);
+                enc.write_byte(*self as u8);
                 Ok(())
             }
 
@@ -77,7 +77,9 @@ fn packet_field_impl(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
 
     let field_names: Vec<_> = fields.iter().filter_map(|f| f.ident.as_ref()).collect();
     let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
-    let field_names_str: Vec<_> = field_names.iter().map(|n| n.to_string()).collect();
+    let optional_count = quote! {
+        0 #(+ <#field_types as crate::io::codecs::PacketCodec>::IS_OPTIONAL as usize)*
+    };
 
     let expanded = quote! {
         #[derive(Debug, Clone)]
@@ -87,16 +89,34 @@ fn packet_field_impl(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
             const SIZE: Option<usize> = None;
 
             fn encode(&self, enc: &mut crate::io::encoder::Encoder) -> crate::io::errors::PacketResult<()> {
+                if #optional_count > 0 {
+                    enc.enter_field();
+                }
+
                 #(
-                    enc.write_var(&self.#field_names)?;
+                    self.#field_names.encode(enc)?;
                 )*
+
+                if #optional_count > 0 {
+                    enc.leave_field();
+                }
+
                 Ok(())
             }
 
             fn decode(dec: &mut crate::io::decoder::Decoder) -> crate::io::errors::PacketResult<Self> {
+                if #optional_count > 0 {
+                    dec.enter_field(#optional_count);
+                }
+
                 #(
-                    let #field_names = dec.read_var::<#field_types>(#field_names_str)?;
+                    let #field_names = <#field_types>::decode(dec)?;
                 )*
+
+                if #optional_count > 0 {
+                    dec.leave_field();
+                }
+
                 Ok(Self {
                     #(#field_names,)*
                 })

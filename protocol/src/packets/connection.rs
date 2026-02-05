@@ -18,7 +18,7 @@ packet! {
         username: VarString<16>,
         identity_token: Option<VarString<8192>>,
         language: VarString<16>,
-        referral_data: Option<VarList<u8, 8192>>,
+        referral_data: VarList<u8, 8192>,
         referral_source: Option<HostAddress>,
     }
 }
@@ -75,6 +75,6 @@ packet! {
     max_size: 32851,
     var {
         access_token: Option<VarString<8192>>,
-        password_challenge: Option<VarList<u8, 64>>
+        password_challenge: VarList<u8, 64>
     }
 }

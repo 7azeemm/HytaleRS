@@ -14,8 +14,6 @@ pub fn write_packet<P: Packet>(packet: &P) -> PacketResult<Vec<u8>> {
         return Err(format!("Packet ID {} not registered", packet_id).into());
     };
 
-    info!("{}: {:#?}", P::name(), P::METADATA);
-
     // Encode payload
     let mut payload = Packet::encode(packet)
         .map_err(|e| format!("Failed to encode packet {}: {}", P::name(), e))?;
@@ -81,6 +79,5 @@ pub fn decode<P: Packet>(data: &[u8]) -> Option<P> {
     };
 
     info!("Decoded Packet {} in {:?}", P::name(), start_time.elapsed());
-    info!("{}: {:#?}", P::name(), P::METADATA);
     Some(packet)
 }
