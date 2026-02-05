@@ -5,3 +5,4 @@ disallowed-types = [
 ]
 # Use Dashmap instead of Mutex<HashMap<>>?
 # Use AHash instead of HashMap?
+# Use LazyLock instead of oncecell::lazy::Lazy?

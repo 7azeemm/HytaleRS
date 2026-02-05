@@ -1,0 +1,15 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+assets.workspace = true
+net.workspace = true
+hytale_core.workspace = true
+
+tokio.workspace = true
+log.workspace = true
