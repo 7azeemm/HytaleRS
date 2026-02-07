@@ -29,7 +29,7 @@ pub trait Packet: PacketCodec + Debug + Send + Sync {
 
     fn encode(&self) -> PacketResult<Vec<u8>> {
         let mut encoder = Encoder::new(&Self::LAYOUT);
-        <Self as PacketCodec>::encode(&self, &mut encoder)?;
+        <Self as PacketCodec>::encode(self, &mut encoder)?;
         Ok(encoder.finish())
     }
 

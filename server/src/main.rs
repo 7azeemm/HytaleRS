@@ -4,7 +4,6 @@ use crate::assets::common::common_module::COMMON_ASSET_MODULE;
 use crate::net::server_network_manager::ServerNetworkManager;
 use log::info;
 use server::HytaleServer;
-use std::sync::LazyLock;
 use std::time::Instant;
 use utils::hytale_logger::Logger;
 use utils::options;

@@ -5,19 +5,14 @@ use crate::assets::common::common_asset::FileCommonAsset;
 use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
 use crate::assets::errors::{AssetError, AssetResult};
 use crate::plugin::plugin_manifest::PluginManifest;
-use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
-use log::{error, info, warn};
+use ahash::{HashMap, HashMapExt, HashSetExt};
+use log::{info, warn};
 use std::any::{Any, TypeId};
 use std::collections::VecDeque;
 use std::error::Error;
-use std::fs;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
-use zip::ZipArchive;
 
 pub struct AssetPack {
     name: String,
@@ -37,7 +32,7 @@ impl AssetPack {
 
         info!("Loading Asset Pack {}", file_name);
 
-        let mut reader = ZipReader::open(path, file_name)?;
+        let reader = ZipReader::open(path, file_name)?;
 
         let manifest = serde_json::from_slice::<PluginManifest>(
             &reader.read_file("manifest.json")?,

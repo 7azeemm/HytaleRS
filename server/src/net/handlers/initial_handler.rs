@@ -4,7 +4,6 @@ use crate::net::handlers::handshake_handler::HandshakePacketHandler;
 use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
 use crate::net::server_network_manager::PROTOCOL_CRC;
 use crate::server::{BOOTED, HytaleServer, SHUTTING_DOWN};
-use protocol::io::packet::Packet;
 use protocol::packets::connection::{ClientType, Connect};
 use std::sync::atomic::Ordering;
 

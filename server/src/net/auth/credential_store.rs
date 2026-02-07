@@ -1,7 +1,7 @@
 use crate::server::HytaleServer;
 use crate::utils::hardware_utils::get_system_uuid;
 use aes_gcm::Aes256Gcm;
-use aes_gcm::aead::{Aead, KeyInit, Nonce};
+use aes_gcm::aead::{Aead, KeyInit};
 use chrono::{DateTime, Utc};
 use log::{error, info};
 use pbkdf2::pbkdf2_hmac;
@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 const ALGORITHM: &str = "AES/GCM/NoPadding";
 const SALT: &[u8] = b"HytaleAuthCredentialStore";

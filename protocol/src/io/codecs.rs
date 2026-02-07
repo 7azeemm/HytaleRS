@@ -222,12 +222,6 @@ impl PacketCodec for String {
 
     fn decode(decoder: &mut Decoder) -> PacketResult<Self> {
         let len = decoder.read_varint()?;
-        if len < 0 {
-            return Err(PacketError::DecodeError(format!(
-                "String length {} is negative while decoding",
-                len
-            )));
-        }
 
         if len > MAX_STRING_LENGTH {
             return Err(PacketError::DecodeError(format!(
@@ -264,12 +258,6 @@ impl<const MAX: usize> PacketCodec for VarString<MAX> {
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let len = dec.read_varint()?;
-        if len < 0 {
-            return Err(PacketError::DecodeError(format!(
-                "VarString length {} is negative while decoding",
-                len
-            )));
-        }
 
         if len > MAX {
             return Err(PacketError::DecodeError(format!(
@@ -456,13 +444,6 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
         }
 
         let len = dec.read_varint()?;
-        if len < 0 {
-            return Err(PacketError::DecodeError(format!(
-                "VarList length {} is negative while decoding",
-                len
-            )));
-        }
-
         if len > MAX {
             return Err(PacketError::DecodeError(format!(
                 "VarList length {} exceeds maximum of {} while decoding",

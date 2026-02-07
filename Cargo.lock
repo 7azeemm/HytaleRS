@@ -2344,7 +2344,6 @@ dependencies = [
  "crossbeam",
  "crossbeam-channel",
  "futures",
- "inventory",
  "jsonwebtoken",
  "log",
  "memchr",

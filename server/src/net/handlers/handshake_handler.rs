@@ -7,11 +7,9 @@ use crate::net::handlers::setup_handler::SetupHandler;
 use crate::net::server_network_manager::SERVER_NETWORK_MANAGER;
 use crate::server::HytaleServer;
 use log::{error, info};
-use protocol::io::codecs::VarList;
 use protocol::packets::connection::{
     AuthGrant, AuthToken, ClientType, Connect, HostAddress, ServerAuthToken,
 };
-use std::time::Duration;
 use tokio::time::Instant;
 use uuid::Uuid;
 

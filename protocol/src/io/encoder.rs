@@ -1,7 +1,7 @@
-use crate::io::MAX_VARINT;
 use crate::io::codecs::PacketCodec;
 use crate::io::errors::{PacketError, PacketResult};
 use crate::io::packet::PacketLayout;
+use crate::io::MAX_VARINT;
 use std::mem::take;
 
 pub struct Encoder {
@@ -43,7 +43,7 @@ impl Scope {
         let offsets = if layout.var_field_count <= 1 {
             None
         } else {
-            let null_bits_size = (layout.var_field_count + 7) / 8;
+            let null_bits_size = layout.var_field_count.div_ceil(8);
             let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
             Some(Offsets {
                 buf: Vec::new(),

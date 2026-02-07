@@ -2,7 +2,7 @@ use crate::assets::asset_store::{AssetStore, StoreBase};
 use crate::assets::asset_type::AssetType;
 use crate::assets::types::block_set::block_set::BlockSet;
 use crate::net::connection_manager::ConnectionContext;
-use log::{info, warn};
+use log::info;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};

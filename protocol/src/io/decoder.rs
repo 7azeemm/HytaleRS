@@ -50,7 +50,7 @@ struct Scope<'a> {
 
 impl<'a> Scope<'a> {
     fn new(dec: &mut Decoder<'a>, pos: usize, layout: &PacketLayout) -> Self {
-        let null_bits_size = (layout.var_field_count + 7) / 8;
+        let null_bits_size = layout.var_field_count.div_ceil(8);
 
         let null_bits = if null_bits_size == 0 {
             None
@@ -79,7 +79,7 @@ impl<'a> Scope<'a> {
 
 impl<'a> Decoder<'a> {
     pub fn new(buf: &'a [u8], layout: &PacketLayout) -> PacketResult<Self> {
-        let null_bits_size = (layout.var_field_count + 7) / 8;
+        let null_bits_size = layout.var_field_count.div_ceil(8);
         let offsets_size = if layout.var_field_count > 1 {
             layout.var_field_count * 4
         } else {

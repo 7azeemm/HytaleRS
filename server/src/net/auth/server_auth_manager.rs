@@ -9,11 +9,9 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use log::{error, info};
 use once_cell::sync::OnceCell;
 use serde_json::Value;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use tokio::time::{Instant, sleep};
-use uuid::Uuid;
+use tokio::time::sleep;
 /*
 1. Fetch JWKS (Used for player auth, not server auth) (in tokio task without awaiting)
 2. Load credentials (tokens), if exists:

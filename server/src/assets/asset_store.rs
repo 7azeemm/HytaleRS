@@ -3,15 +3,14 @@ use crate::assets::asset_type::{Asset, AssetType};
 use crate::assets::structs::{ParsedAsset, PendingAsset, StoreStats};
 use crate::net::connection_manager::ConnectionContext;
 use async_trait::async_trait;
-use futures::future::join_all;
 use log::{info, warn};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rayon::iter::Either;
 use rayon::prelude::{
-    IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+    IntoParallelIterator, ParallelIterator,
 };
 use serde_json::Value;
-use std::any::{Any, TypeId, type_name};
+use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;

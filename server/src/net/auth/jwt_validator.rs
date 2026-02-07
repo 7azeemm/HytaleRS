@@ -1,21 +1,20 @@
 use crate::net::auth::server_auth_manager::ServerAuthManager;
-use crate::net::auth::services::session_service::{SESSION_SERVICE_URL, SessionService};
-use base64::Engine;
+use crate::net::auth::services::session_service::{SessionService, SESSION_SERVICE_URL};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use jsonwebtoken::crypto::verify;
-use jsonwebtoken::errors::ErrorKind::MissingRequiredClaim;
+use base64::Engine;
 use jsonwebtoken::jwk::{Jwk, JwkSet};
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use log::info;
+use parking_lot::Mutex;
 use rustls::pki_types::CertificateDer;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use subtle::ConstantTimeEq;
-use tokio::sync::{Notify, OnceCell, Semaphore};
+use tokio::sync::Notify;
 use uuid::Uuid;
 
 const JWK_CACHE_EXPIRY: Duration = Duration::from_secs(3600);
@@ -97,7 +96,7 @@ impl JWTValidator {
     async fn get_jwks(&self, force: bool) -> Option<JwkSet> {
         if !force {
             // Check cached value
-            if let Some((jwks_data, expiry)) = self.jwks.lock().unwrap().as_ref() {
+            if let Some((jwks_data, expiry)) = self.jwks.lock().as_ref() {
                 if expiry.elapsed() < JWK_CACHE_EXPIRY {
                     return Some(jwks_data.clone());
                 }
@@ -113,7 +112,6 @@ impl JWTValidator {
         self.fetch_done.notified().await;
         self.jwks
             .lock()
-            .unwrap()
             .as_ref()
             .map(|(jwks, _)| jwks.clone())
     }
@@ -122,7 +120,7 @@ impl JWTValidator {
         tokio::spawn(async move {
             let validator = ServerAuthManager::get().jwt_validator.clone();
             if let Some(jwks) = validator.session_service.fetch_jwks().await {
-                *validator.jwks.lock().unwrap() = Some((jwks, Instant::now()));
+                *validator.jwks.lock() = Some((jwks, Instant::now()));
             }
             validator.is_fetching.store(false, Ordering::Relaxed);
             validator.fetch_done.notify_waiters();

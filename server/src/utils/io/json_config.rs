@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::error;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::fs;

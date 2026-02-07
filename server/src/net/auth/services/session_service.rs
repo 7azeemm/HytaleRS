@@ -3,9 +3,7 @@ use jsonwebtoken::jwk::JwkSet;
 use log::{error, info};
 use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
-use std::error::Error;
 use std::time::Duration;
-use url::form_urlencoded;
 use uuid::Uuid;
 
 pub const SESSION_SERVICE_URL: &str = "https://sessions.hytale.com";

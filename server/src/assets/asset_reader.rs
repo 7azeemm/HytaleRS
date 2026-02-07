@@ -5,8 +5,6 @@ use parking_lot::Mutex;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
 use zip::ZipArchive;
 
 pub struct ZipReader {
@@ -17,7 +15,7 @@ pub struct ZipReader {
 impl ZipReader {
     pub fn open<P: AsRef<Path>>(path: P, file_name: &str) -> AssetResult<Self> {
         let file = File::open(path.as_ref()).map_err(|e| AssetError::ZipError(e.to_string()))?;
-        let mut zip = ZipArchive::new(file).map_err(|e| AssetError::ZipError(e.to_string()))?;
+        let zip = ZipArchive::new(file).map_err(|e| AssetError::ZipError(e.to_string()))?;
 
         // Build file cache
         let file_cache: HashMap<String, usize> = zip

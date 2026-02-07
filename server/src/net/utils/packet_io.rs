@@ -1,7 +1,7 @@
 use log::{error, info};
 use protocol::io::errors::PacketResult;
 use protocol::io::packet::{Packet, get_packet_info};
-use quinn::{ReadError, ReadExactError, RecvStream};
+use quinn::RecvStream;
 use std::io::Cursor;
 use std::time::Instant;
 use tokio::io::AsyncReadExt;

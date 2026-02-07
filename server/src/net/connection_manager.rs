@@ -2,18 +2,14 @@ use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
 use crate::net::utils::packet_io::{decode, read_packet, write_packet};
 use crate::net::utils::rate_limiter::RateLimiter;
 use crate::net::utils::stage_timer::StageTimer;
-use log::{debug, error, info, warn};
-use parking_lot::Mutex;
+use log::{error, info, warn};
 use protocol::io::packet::Packet;
 use protocol::packets::connection::{Disconnect, DisconnectCause};
-use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
+use quinn::{RecvStream, SendStream};
 use rustls::pki_types::CertificateDer;
 use std::error::Error;
-use std::io::{Cursor, Read};
 use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::io::AsyncReadExt;
+use std::time::Duration;
 use tokio::time::timeout;
 
 pub struct Connection {

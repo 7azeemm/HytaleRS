@@ -46,4 +46,3 @@ subtle.workspace = true
 zstd.workspace = true
 zip.workspace = true
 bytes.workspace = true
-inventory.workspace = true

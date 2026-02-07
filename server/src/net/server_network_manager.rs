@@ -8,23 +8,14 @@ use crate::net::utils::stage_timer::StageTimer;
 use crate::server::HytaleServer;
 use log::{error, info};
 use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
 use quinn::crypto::rustls::QuicServerConfig;
 use quinn::{
-    Connecting, ConnectionError, Endpoint, RecvStream, SendStream, ServerConfig, TransportConfig,
+    Connecting, ConnectionError, Endpoint, ServerConfig, TransportConfig,
     congestion,
 };
-use rcgen::Certificate;
-use rustls::client::danger::HandshakeSignatureValid;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, TrustAnchor, UnixTime};
-use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
-use rustls::server::{ClientCertVerifierBuilder, NoClientAuth, WebPkiClientVerifier};
-use rustls::{DigitallySignedStruct, DistinguishedName, RootCertStore, SignatureScheme};
-use std::any::Any;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::error::Error;
-use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::time::timeout;
 use uuid::Uuid;
 
