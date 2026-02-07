@@ -7,9 +7,43 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
-assets.workspace = true
-net.workspace = true
-hytale_core.workspace = true
+protocol.workspace = true
 
 tokio.workspace = true
-log.workspace = true
+log = { workspace = true, features = ["std"] }
+chrono.workspace = true
+colored.workspace = true
+once_cell.workspace = true
+clap.workspace = true
+parking_lot.workspace = true
+crossbeam.workspace = true
+ahash.workspace = true
+rayon.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+semver.workspace = true
+uuid.workspace = true
+crossbeam-channel.workspace = true
+criterion.workspace = true
+rcgen.workspace = true
+rustls.workspace = true
+quinn.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+memchr.workspace = true
+reqwest.workspace = true
+jsonwebtoken.workspace = true
+regex.workspace = true
+pbkdf2.workspace = true
+aes-gcm.workspace = true
+sha2.workspace = true
+rand.workspace = true
+bson.workspace = true
+url.workspace = true
+base64.workspace = true
+subtle.workspace = true
+zstd.workspace = true
+zip.workspace = true
+bytes.workspace = true
+inventory.workspace = true

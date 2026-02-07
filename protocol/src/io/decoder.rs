@@ -1,97 +1,117 @@
+use log::info;
 use crate::io::codecs::PacketCodec;
-use crate::io::packet::PacketLayout;
 use crate::io::errors::{PacketError, PacketResult};
+use crate::io::packet::PacketLayout;
 
 pub struct Decoder<'a> {
-    fixed_buf: &'a [u8],
-    var_buf: &'a [u8],
-
-    null_bits: Vec<NullBits<'a>>,
-    current_null_bits_index: usize,
-    offsets_buf: Option<&'a [u8]>,
-
-    fixed_pos: usize,
-    var_pos: usize,
-    offset_pos: usize,
-    in_fixed_block: bool,
+    buf: &'a [u8],
+    pos: usize,
+    scopes: Vec<Scope<'a>>,
 }
 
 struct NullBits<'a> {
     buf: &'a [u8],
     index: usize,
-    current_value: bool
 }
 
-impl<'a> Decoder<'a> {
-    pub fn new(data: &'a [u8], layout: &PacketLayout) -> PacketResult<Self> {
-        let total_size = data.len();
+struct Offsets<'a> {
+    buf: Option<&'a [u8]>,
+    pos: usize,
+    start_pos: usize,
+    size: usize,
+}
 
-        let has_offsets = layout.var_field_count > 1;
-        let null_bits_size = (layout.optional_field_count + 7) / 8;
-        let fixed_size = layout.fixed_block_size;
-        let offsets_size = if has_offsets { layout.var_field_count * 4 } else { 0 };
-
-        let expected_min_size = null_bits_size + fixed_size + offsets_size;
-        if total_size < expected_min_size {
-            return Err(PacketError::Error(
-                format!("Packet too small: expected at least {}, got {}", expected_min_size, total_size)
+impl<'a> Offsets<'a> {
+    fn read_offset(&mut self, field: &'static str) -> PacketResult<i32> {
+        let buf = self.buf.as_mut().unwrap();
+        if buf.len() < 4 {
+            return Err(PacketError::DecodeError(
+                format!("Offset out of bounds while reading field '{}'", field)
             ));
         }
 
-        let mut pos = 0;
+        let pos = self.pos;
+        let offset_bytes = &buf[pos..pos + 4];
+        self.pos += 4;
 
-        let null_bits_buf = &data[pos..pos + null_bits_size];
-        pos += null_bits_size;
+        let offset = i32::from_le_bytes(offset_bytes.try_into().unwrap());
+        if offset == -1 { return Ok(-1) }
 
-        let fixed_buf = &data[pos..pos + fixed_size];
-        pos += fixed_size;
+        Ok((self.start_pos + self.size) as i32 + offset)
+    }
+}
 
-        let offsets_buf = if has_offsets {
-            let buf = &data[pos..pos + offsets_size];
-            pos += offsets_size;
-            Some(buf)
-        } else { None };
+struct Scope<'a> {
+    null_bits: Option<NullBits<'a>>,
+    offsets: Option<Offsets<'a>>,
+}
 
-        let var_buf = &data[pos..];
+impl<'a> Scope<'a> {
+    fn new(dec: &mut Decoder<'a>, pos: usize, layout: &PacketLayout) -> Self {
+        let null_bits_size = (layout.var_field_count + 7) / 8;
 
-        let null_bits = NullBits {
-            buf: null_bits_buf,
-            index: 0,
-            current_value: false
+        let null_bits = if null_bits_size == 0 { None } else {
+            dec.pos += null_bits_size;
+            Some(NullBits {
+                buf: &dec.buf[pos..pos + null_bits_size],
+                index: 0,
+            })
         };
 
-        Ok(Decoder {
-            fixed_buf,
-            var_buf,
-            null_bits: vec![null_bits],
-            current_null_bits_index: 0,
-            offsets_buf,
-            fixed_pos: 0,
-            var_pos: 0,
-            offset_pos: 0,
-            in_fixed_block: true,
-        })
+        let offsets = if layout.var_field_count <= 1 { None } else {
+            Some(Offsets{
+                buf: None,
+                pos: 0,
+                start_pos: pos + null_bits_size + layout.fixed_block_size,
+                size: layout.var_field_count * 4
+            })
+        };
+
+        Self { null_bits, offsets }
     }
+}
 
-    pub fn read_fixed<T: PacketCodec>(&mut self, field: &'static str) -> PacketResult<T> {
-        assert!(T::SIZE.is_some(), "`{field}` requires fixed size");
+impl<'a> Decoder<'a> {
+    pub fn new(buf: &'a [u8], layout: &PacketLayout) -> PacketResult<Self> {
+        let null_bits_size = (layout.var_field_count + 7) / 8;
+        let offsets_size = if layout.var_field_count > 1 { layout.var_field_count * 4 } else { 0 };
 
-        // workaround to suppress false IDE warning
-        let is_optional: bool = T::IS_OPTIONAL;
-        if is_optional {
-            let _ = self.read_null_bit();
+        let min_size = null_bits_size + layout.fixed_block_size + offsets_size;
+        if buf.len() < min_size {
+            return Err(PacketError::Error(
+                format!("Packet too small: expected at least {}, got {}", min_size, buf.len())
+            ));
         }
 
-        T::decode(self)
+        let mut dec = Decoder {
+            scopes: vec![],
+            pos: 0,
+            buf
+        };
+
+        let scope = Scope::new(&mut dec, 0, layout);
+        dec.scopes.push(scope);
+
+        Ok(dec)
     }
 
-    pub fn read_var<T: PacketCodec>(&mut self, field: &'static str) -> PacketResult<T> {
-        // workaround to suppress false IDE warning
-        let is_optional: bool = T::IS_OPTIONAL;
-        if !is_optional || self.read_null_bit() {
-            if let Some(offset_buf) = self.offsets_buf {
-                let offset = self.read_offset(offset_buf, field)?;
-                self.seek_var(offset, field)?;
+    pub fn read<T: PacketCodec>(&mut self, field: &'static str) -> PacketResult<T> {
+        if T::SIZE.is_none() {
+            let mut entering_var_block = None;
+            let current_pos = self.pos;
+            if let Some(offsets) = self.scope().offsets.as_mut() {
+                if offsets.buf.is_some() {
+                    let new_pos = offsets.read_offset(field)?;
+                    self.move_to(new_pos, field)?;
+                } else if current_pos == offsets.start_pos {
+                    entering_var_block = Some(offsets.size);
+                }
+            }
+
+            if let Some(offsets_size) = entering_var_block {
+                let buf = &self.buf[self.pos + 4..self.pos + offsets_size];
+                self.pos += offsets_size;
+                self.scope().offsets.as_mut().unwrap().buf = Some(buf);
             }
         }
 
@@ -99,52 +119,61 @@ impl<'a> Decoder<'a> {
     }
 
     pub fn read_bytes(&mut self, count: usize) -> PacketResult<&'a [u8]> {
-        let buf = self.buf();
-        let pos = self.pos();
-
-        if pos + count > buf.len() {
+        let pos = self.pos;
+        if pos + count > self.buf.len() {
             return Err(PacketError::DecodeError("EOF while reading bytes".into()));
         }
 
-        let bytes = &buf[pos..pos + count];
-        self.inc_pos(count);
+        let bytes = &self.buf[pos..pos + count];
+        self.pos += count;
 
         Ok(bytes)
     }
 
     pub fn read_byte(&mut self) -> PacketResult<u8> {
-        let bytes = self.read_bytes(1)?;
-        Ok(bytes[0])
+        Ok(self.read_bytes(1)?[0])
     }
 
-    pub fn buf(&self) -> &'a [u8] {
-        match self.in_fixed_block {
-            true => self.fixed_buf,
-            false => self.var_buf,
+    pub fn enter_field(&mut self, layout: &PacketLayout) {
+        let scope = Scope::new(self, self.pos, layout);
+        self.scopes.push(scope);
+    }
+
+    pub fn leave_field(&mut self) {
+        self.scopes.pop().unwrap();
+    }
+
+    pub fn read_null_bit(&mut self) -> bool {
+        let null_bits = self.scope().null_bits.as_mut().unwrap();
+        let byte_index = null_bits.index / 8;
+        let bit_index = null_bits.index % 8;
+
+        null_bits.index += 1;
+
+        if byte_index >= null_bits.buf.len() {
+            return false;
         }
+
+        let byte = null_bits.buf[byte_index];
+        (byte & (1 << bit_index)) != 0
     }
 
-    pub fn pos(&self) -> usize {
-        match self.in_fixed_block {
-            true => self.fixed_pos,
-            false => self.var_pos,
+    fn move_to(&mut self, new_pos: i32, field: &'static str) -> PacketResult<()> {
+        if new_pos == -1 { return Ok(()) }
+        let new_pos = new_pos as usize;
+
+        if new_pos >= self.buf.len() {
+            return Err(PacketError::DecodeError(
+                format!("Offset {} out of bounds for variable field '{}'", new_pos, field)
+            ));
         }
+
+        self.pos = new_pos;
+        Ok(())
     }
 
-    pub fn inc_pos(&mut self, count: usize) {
-        match self.in_fixed_block {
-            true => self.fixed_pos += count,
-            false => self.var_pos += count,
-        }
-    }
-
-    pub fn current_null_value(&self) -> bool {
-        self.null_bits[self.current_null_bits_index].current_value
-    }
-
-    pub fn enter_var_block(&mut self) {
-        assert!(self.in_fixed_block, "enter_var_block called when already in variable block");
-        self.in_fixed_block = false;
+    fn scope(&mut self) -> &mut Scope<'a> {
+        self.scopes.last_mut().unwrap()
     }
 
     pub fn read_varint(&mut self) -> PacketResult<usize> {
@@ -165,67 +194,5 @@ impl<'a> Decoder<'a> {
 
             shift += 7;
         }
-    }
-
-    pub fn enter_field(&mut self, optional_field_count: usize) -> PacketResult<()> {
-        let null_bits_size = (optional_field_count + 7) / 8;
-        let buf = self.read_bytes(null_bits_size)?;
-
-        self.current_null_bits_index = self.null_bits.len();
-        self.null_bits.push(NullBits {
-            buf,
-            index: 0,
-            current_value: false
-        });
-
-        Ok(())
-    }
-
-    pub fn leave_field(&mut self) {
-        self.null_bits.pop();
-        self.current_null_bits_index = self.null_bits.len() - 1;
-    }
-
-    pub fn read_null_bit(&mut self) -> bool {
-        let null_bits = &mut self.null_bits[self.current_null_bits_index];
-        let byte_index = null_bits.index / 8;
-        let bit_index = null_bits.index % 8;
-
-        null_bits.index += 1;
-
-        if byte_index >= null_bits.buf.len() {
-            return false;
-        }
-
-        let byte = null_bits.buf[byte_index];
-        null_bits.current_value = (byte & (1 << bit_index)) != 0;
-        null_bits.current_value
-    }
-
-    fn read_offset(&mut self, buf: &'a [u8], field: &'static str) -> PacketResult<i32> {
-        if self.offset_pos + 4 > buf.len() {
-            return Err(PacketError::DecodeError(
-                format!("Offset out of bounds while reading field '{}'", field)
-            ));
-        }
-
-        let offset_bytes = &buf[self.offset_pos..self.offset_pos + 4];
-        self.offset_pos += 4;
-
-        let bytes: [u8; 4] = offset_bytes.try_into().unwrap();
-        Ok(i32::from_le_bytes(bytes))
-    }
-
-    fn seek_var(&mut self, offset: i32, field: &'static str) -> PacketResult<()> {
-        if offset == -1 { return Ok(()) }
-        let offset = offset as usize;
-
-        if offset >= self.var_buf.len() {
-            return Err(PacketError::DecodeError(
-                format!("Offset {} out of bounds for variable field '{}'", offset, field)
-            ));
-        }
-        self.var_pos = offset;
-        Ok(())
     }
 }

@@ -1,13 +1,22 @@
 use std::sync::LazyLock;
 use std::time::Instant;
 use log::info;
-use assets::asset_module::ASSET_MODULE;
-use assets::asset_registry::STORE_REGISTRY;
-use assets::common::common_module::COMMON_ASSET_MODULE;
-use hytale_core::hytale_server::HytaleServer;
-use hytale_core::utils::hytale_logger::Logger;
-use hytale_core::utils::options;
-use net::server_network_manager::ServerNetworkManager;
+use server::HytaleServer;
+use utils::hytale_logger::Logger;
+use utils::options;
+use crate::assets::asset_module::ASSET_MODULE;
+use crate::assets::asset_registry::STORE_REGISTRY;
+use crate::assets::common::common_module::COMMON_ASSET_MODULE;
+use crate::net::server_network_manager::ServerNetworkManager;
+
+pub mod server;
+pub mod config;
+pub mod utils;
+pub mod command;
+pub mod event;
+pub mod plugin;
+pub mod net;
+pub mod assets;
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +28,7 @@ async fn main() {
     HytaleServer::init().await;
     ServerNetworkManager::init().await;
 
-    STORE_REGISTRY.register_stores();
+    STORE_REGISTRY.register_stores().await;
     ASSET_MODULE.init().await;
     COMMON_ASSET_MODULE.init().await;
 

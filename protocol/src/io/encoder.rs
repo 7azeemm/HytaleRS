@@ -1,89 +1,152 @@
+use std::mem::take;
 use crate::io::codecs::PacketCodec;
-use crate::io::MAX_VARINT;
 use crate::io::errors::{PacketError, PacketResult};
+use crate::io::MAX_VARINT;
 use crate::io::packet::PacketLayout;
 
 pub struct Encoder {
-    fixed_buf: Vec<u8>,
-    var_buf: Vec<u8>,
-
-    null_bits: Vec<NullBits>,
-    current_null_bits_index: usize,
-    offsets_buf: Option<Vec<u8>>,
-
-    in_fixed_block: bool,
+    buf: Vec<u8>,
+    scopes: Vec<Scope>,
 }
 
 struct NullBits {
     buf: Vec<u8>,
     index: usize,
-    current_byte: u8
+    current_byte: u8,
+    pos: usize,
+}
+
+struct Offsets {
+    buf: Vec<u8>,
+    pos: usize,
+    var_pos: usize,
+}
+
+struct Scope {
+    null_bits: Option<NullBits>,
+    offsets: Option<Offsets>,
+}
+
+impl Scope {
+    fn new(pos: usize, layout: &PacketLayout) -> Self {
+        let null_bits = if layout.var_field_count == 0 { None } else {
+            Some(NullBits {
+                buf: Vec::new(),
+                index: 0,
+                current_byte: 0,
+                pos
+            })
+        };
+
+        let offsets = if layout.var_field_count <= 1 { None } else {
+            let null_bits_size = (layout.var_field_count + 7) / 8;
+            let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
+            Some(Offsets {
+                buf: Vec::new(),
+                pos: offsets_pos,
+                var_pos: pos + layout.fixed_block_size
+            })
+        };
+
+        Self { null_bits, offsets }
+    }
 }
 
 impl Encoder {
     pub fn new(layout: &PacketLayout) -> Self {
-        let offsets_buf = if layout.var_field_count > 1 { Some(Vec::new()) } else { None };
-        let null_bits = NullBits{
+        Self {
             buf: Vec::new(),
-            index: 0,
-            current_byte: 0
-        };
-
-        Encoder {
-            fixed_buf: Vec::new(),
-            var_buf: Vec::new(),
-            null_bits: vec![null_bits],
-            current_null_bits_index: 0,
-            offsets_buf,
-            in_fixed_block: true,
+            scopes: vec![Scope::new(0, layout)],
         }
     }
 
-    pub fn write_fixed<T: PacketCodec>(&mut self, value: &T, field: &'static str) -> PacketResult<()> {
-        assert!(T::SIZE.is_some(), "`{field}` requires fixed size");
-        value.encode(self)
-    }
-
-    pub fn write_var<T: PacketCodec>(&mut self, value: &T) -> PacketResult<()> {
-        // workaround to suppress false IDE warning
-        let is_optional: bool = T::IS_OPTIONAL;
-        if is_optional {
-            self.add_null_bit(value.has_value())
-        }
-        
-        if let Some(offsets_buf) = self.offsets_buf.as_mut() {
-            let offset = if value.has_value() { self.var_buf.len() as i32 } else { -1 };
-            offsets_buf.extend_from_slice(&offset.to_le_bytes());
+    pub fn write<T: PacketCodec>(&mut self, value: &T) -> PacketResult<()> {
+        if T::SIZE.is_none() {
+            let buf_len = self.buf.len();
+            if let Some(offsets) = self.scope().offsets.as_mut() {
+                let offset = match value.has_value() {
+                    true => (buf_len - offsets.var_pos) as i32,
+                    false => -1,
+                };
+                offsets.buf.extend_from_slice(&offset.to_le_bytes());
+            }
         }
 
         value.encode(self)
     }
 
     pub fn write_bytes(&mut self, bytes: &[u8]) {
-        if self.in_fixed_block {
-            self.fixed_buf.extend_from_slice(bytes);
-        } else {
-            self.var_buf.extend_from_slice(bytes);
-        }
+        self.buf.extend_from_slice(bytes);
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-        if self.in_fixed_block {
-            self.fixed_buf.push(byte);
-        } else {
-            self.var_buf.push(byte);
+        self.buf.push(byte);
+    }
+
+    pub fn add_null_bit(&mut self, is_present: bool) {
+        let null_bits = self.scope().null_bits.as_mut().unwrap();
+        if is_present {
+            null_bits.current_byte |= 1 << null_bits.index;
+        }
+
+        null_bits.index += 1;
+
+        // When we reach 8 bits, flush to buffer
+        if null_bits.index == 8 {
+            null_bits.buf.push(null_bits.current_byte);
+            null_bits.current_byte = 0;
+            null_bits.index = 0;
         }
     }
 
-    pub fn write_zeros(&mut self, count: usize) {
-        self.fixed_buf.resize(self.fixed_buf.len() + count, 0);
+    pub fn enter_field(&mut self, layout: &PacketLayout) {
+        self.scopes.push(Scope::new(self.buf.len(), layout));
     }
 
-    pub fn enter_var_block(&mut self) {
-        assert!(self.in_fixed_block, "enter_var_block called when already in variable block");
-        self.in_fixed_block = false;
+    pub fn leave_field(&mut self) {
+        let mut scope = self.scopes.pop().unwrap();
+
+        if let Some(null_bits) = scope.null_bits.as_mut() {
+            if null_bits.index > 0 {
+                null_bits.buf.push(null_bits.current_byte);
+            }
+
+            let pos = null_bits.pos;
+            self.buf.splice(pos..pos, take(&mut null_bits.buf));
+        }
+
+        if let Some(offsets) = scope.offsets {
+            let pos = offsets.pos;
+            self.buf.splice(pos..pos, offsets.buf);
+        }
     }
-    
+
+    pub fn finish(mut self) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        let mut scope = self.scopes.pop().unwrap();
+        if let Some(null_bits) = scope.null_bits.as_mut() {
+            if null_bits.index > 0 {
+                null_bits.buf.push(null_bits.current_byte);
+            }
+
+            result.extend_from_slice(&null_bits.buf)
+        }
+
+        result.extend_from_slice(&self.buf);
+
+        if let Some(offsets) = scope.offsets {
+            let pos = offsets.pos;
+            result.splice(pos..pos, offsets.buf);
+        }
+
+        result
+    }
+
+    fn scope(&mut self) -> &mut Scope {
+        self.scopes.last_mut().unwrap()
+    }
+
     pub fn write_varint(&mut self, mut value: usize) -> PacketResult<()> {
         if value > MAX_VARINT {
             return Err(PacketError::EncodeError("varint overflow".into()));
@@ -104,53 +167,5 @@ impl Encoder {
         }
 
         Ok(())
-    }
-
-    pub fn enter_field(&mut self) {
-        self.current_null_bits_index = self.null_bits.len();
-        self.null_bits.push(NullBits {
-            buf: Vec::new(),
-            index: 0,
-            current_byte: 0,
-        })
-    }
-
-    pub fn leave_field(&mut self) {
-        let null_bits = self.null_bits.pop().unwrap();
-        self.current_null_bits_index = self.null_bits.len() - 1;
-        self.write_bytes(&null_bits.buf);
-    }
-
-    pub fn finish(mut self) -> Vec<u8> {
-        // Flush any pending null byte
-        let null_bits = &mut self.null_bits[self.current_null_bits_index];
-        if null_bits.index > 0 {
-            null_bits.buf.push(null_bits.current_byte);
-        }
-
-        let mut result = Vec::new();
-        result.extend_from_slice(&null_bits.buf);
-        result.extend_from_slice(&self.fixed_buf);
-        if let Some(offsets_buf) = self.offsets_buf {
-            result.extend_from_slice(&offsets_buf);
-        }
-        result.extend_from_slice(&self.var_buf);
-        result
-    }
-
-    pub fn add_null_bit(&mut self, is_present: bool) {
-        let null_bits = &mut self.null_bits[self.current_null_bits_index];
-        if is_present {
-            null_bits.current_byte |= 1 << null_bits.index;
-        }
-
-        null_bits.index += 1;
-
-        // When we reach 8 bits, flush to buffer
-        if null_bits.index == 8 {
-            null_bits.buf.push(null_bits.current_byte);
-            null_bits.current_byte = 0;
-            null_bits.index = 0;
-        }
     }
 }

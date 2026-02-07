@@ -9,8 +9,8 @@ workspace = true
 [dependencies]
 macros.workspace = true
 
-log.workspace = true
 uuid.workspace = true
 inventory.workspace = true
 num_enum.workspace = true
 strum_macros.workspace = true
+log.workspace = true

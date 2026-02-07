@@ -2,10 +2,7 @@
 resolver = "3"
 members = [
     "server",
-    "net",
     "protocol",
-    "assets",
-    "core",
     "macros",
 ]
 
@@ -30,10 +27,7 @@ disallowed_types = "deny"
 
 [workspace.dependencies]
 server = { path = "server" }
-net = { path = "net" }
 protocol = { path = "protocol" }
-assets = { path = "assets" }
-hytale_core = { path = "core" }
 macros = { path = "macros" }
 
 tokio = { version = "1.49.0", features = ["fs", "time", "rt", "rt-multi-thread", "macros"] }
@@ -57,7 +51,7 @@ rustls = "0.23.36"
 quinn = "0.11.9"
 anyhow = "1.0.100"
 futures = "0.3.31"
-quote = "1.0.43"
+quote = "1.0.44"
 syn = "2.0.114"
 proc-macro2 = "1.0.105"
 async-trait = "0.1.89"

@@ -20,21 +20,21 @@ static PACKETS: LazyLock<Vec<Option<&'static PacketInfo>>> = LazyLock::new(|| {
     v
 });
 
-pub trait Packet: PacketCodec + Debug {
-    const METADATA: PacketLayout;
+pub trait Packet: PacketCodec + Debug + Send + Sync {
+    const LAYOUT: PacketLayout;
     const ID: u32;
     const NAME: &'static str;
     const IS_COMPRESSED: bool = false;
     const MAX_SIZE: u32;
 
     fn encode(&self) -> PacketResult<Vec<u8>> {
-        let mut encoder = Encoder::new(&Self::METADATA);
+        let mut encoder = Encoder::new(&Self::LAYOUT);
         <Self as PacketCodec>::encode(&self, &mut encoder)?;
         Ok(encoder.finish())
     }
 
     fn decode(data: &[u8]) -> PacketResult<Self> {
-        let mut decoder = Decoder::new(data, &Self::METADATA)?;
+        let mut decoder = Decoder::new(data, &Self::LAYOUT)?;
         <Self as PacketCodec>::decode(&mut decoder)
     }
 
@@ -52,7 +52,6 @@ pub fn get_packet_info(id: u32) -> Option<&'static PacketInfo> {
 pub struct PacketLayout {
     pub fixed_block_size: usize,
     pub var_field_count: usize,
-    pub optional_field_count: usize,
 }
 
 #[derive(Debug)]

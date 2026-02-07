@@ -1,4 +1,7 @@
+use std::collections::HashMap;
 use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -8,9 +11,8 @@ use crate::io::errors::{PacketError, PacketResult};
 
 const MAX_STRING_LENGTH: usize = 4_096_000;
 
-pub trait PacketCodec: Sized {
+pub trait PacketCodec: Sized + Debug {
     const SIZE: Option<usize>;
-    const IS_OPTIONAL: bool = false;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()>;
     fn decode(dec: &mut Decoder) -> PacketResult<Self>;
@@ -305,30 +307,30 @@ impl<const MAX: usize> AsRef<str> for VarString<MAX> {
     }
 }
 
-impl<const MAX: usize> fmt::Display for VarString<MAX> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<const MAX: usize> Display for VarString<MAX> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct FixedAsciiString<const N: usize>(pub String);
+pub struct FixedString<const N: usize>(pub String);
 
-impl<const N: usize> PacketCodec for FixedAsciiString<N> {
+impl<const N: usize> PacketCodec for FixedString<N> {
     const SIZE: Option<usize> = Some(N);
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
         if len > N {
             return Err(PacketError::EncodeError(
-                format!("FixedAsciiString length {} exceeds maximum of {} while encoding", len, N)
+                format!("FixedString length {} exceeds maximum of {} while encoding", len, N)
             ));
         }
 
         enc.write_bytes(self.0.as_bytes());
         if len < N {
-            enc.write_zeros(N - len);
+            enc.write_bytes(&vec![0; N - len]);
         }
         Ok(())
     }
@@ -340,7 +342,7 @@ impl<const N: usize> PacketCodec for FixedAsciiString<N> {
     }
 }
 
-impl<const N: usize> Deref for FixedAsciiString<N> {
+impl<const N: usize> Deref for FixedString<N> {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
@@ -348,42 +350,43 @@ impl<const N: usize> Deref for FixedAsciiString<N> {
     }
 }
 
-impl<const N: usize> DerefMut for FixedAsciiString<N> {
+impl<const N: usize> DerefMut for FixedString<N> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<const N: usize> From<String> for FixedAsciiString<N> {
+impl<const N: usize> From<String> for FixedString<N> {
     fn from(s: String) -> Self {
         Self(s)
     }
 }
 
-impl<const N: usize> From<FixedAsciiString<N>> for String {
-    fn from(s: FixedAsciiString<N>) -> Self {
+impl<const N: usize> From<FixedString<N>> for String {
+    fn from(s: FixedString<N>) -> Self {
         s.0
     }
 }
 
-impl<const N: usize> AsRef<str> for FixedAsciiString<N> {
+impl<const N: usize> AsRef<str> for FixedString<N> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<const N: usize> fmt::Display for FixedAsciiString<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<const N: usize> Display for FixedString<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 impl<T: PacketCodec> PacketCodec for Vec<T> {
     const SIZE: Option<usize> = None;
-    const IS_OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
+        enc.add_null_bit(len != 0);
+
         if len > 0 {
             enc.write_varint(len)?;
             for item in self {
@@ -394,10 +397,10 @@ impl<T: PacketCodec> PacketCodec for Vec<T> {
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if !dec.current_null_value() {
+        if !dec.read_null_bit() {
             return Ok(Vec::new())
         }
-        
+
         let len = dec.read_varint()?;
         let mut items = Vec::with_capacity(len);
         for _ in 0..len {
@@ -417,17 +420,18 @@ pub struct VarList<T, const MAX: usize>(pub Vec<T>);
 
 impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
     const SIZE: Option<usize> = None;
-    const IS_OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
+        enc.add_null_bit(len != 0);
+
         if len > 0 {
             if len > MAX {
                 return Err(PacketError::EncodeError(
                     format!("VarList length {} exceeds maximum of {} while encoding", len, MAX)
                 ));
             }
-            
+
             enc.write_varint(len)?;
             for item in &self.0 {
                 item.encode(enc)?;
@@ -437,7 +441,7 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if !dec.current_null_value() {
+        if !dec.read_null_bit() {
             return Ok(Self(Vec::new()))
         }
 
@@ -498,17 +502,55 @@ impl<T, const MAX: usize> AsRef<[T]> for VarList<T, MAX> {
     }
 }
 
-impl<T: fmt::Debug, const MAX: usize> fmt::Display for VarList<T, MAX> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<T: Debug, const MAX: usize> Display for VarList<T, MAX> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.0)
+    }
+}
+
+impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
+    const SIZE: Option<usize> = None;
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        let len = self.len();
+        enc.add_null_bit(len != 0);
+
+        if len > 0 {
+            enc.write_varint(len)?;
+            for (k, v) in self {
+                k.encode(enc)?;
+                v.encode(enc)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        if !dec.read_null_bit() {
+            return Ok(HashMap::new())
+        }
+
+        let len = dec.read_varint()?;
+        let mut items = HashMap::with_capacity(len);
+        for _ in 0..len {
+            let k = K::decode(dec)?;
+            let v = V::decode(dec)?;
+            items.insert(k, v);
+        }
+        Ok(items)
+    }
+
+    fn has_value(&self) -> bool {
+        !self.is_empty()
     }
 }
 
 impl<T: PacketCodec> PacketCodec for Option<T> {
     const SIZE: Option<usize> = None;
-    const IS_OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        enc.add_null_bit(self.is_some());
+
         match self {
             Some(v) => v.encode(enc),
             None => Ok(())
@@ -516,7 +558,7 @@ impl<T: PacketCodec> PacketCodec for Option<T> {
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if dec.current_null_value() {
+        if dec.read_null_bit() {
             T::decode(dec).map(Some)
         } else {
             Ok(None)
