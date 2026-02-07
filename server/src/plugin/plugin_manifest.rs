@@ -16,7 +16,7 @@ pub struct PluginManifest {
     pub optional_dependencies: HashMap<String, String>,
     pub load_before: HashMap<String, String>,
     pub disabled_by_default: bool,
-    pub includes_asset_pack: bool
+    pub includes_asset_pack: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,5 +24,5 @@ pub struct PluginManifest {
 pub struct AuthorInfo {
     pub name: Option<String>,
     pub email: Option<String>,
-    pub url: Option<String>
+    pub url: Option<String>,
 }

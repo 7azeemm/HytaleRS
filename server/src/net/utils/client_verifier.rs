@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Formatter};
-use rustls::{DigitallySignedStruct, DistinguishedName, SignatureScheme};
 use rustls::client::danger::HandshakeSignatureValid;
 use rustls::pki_types::{CertificateDer, UnixTime};
 use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
+use rustls::{DigitallySignedStruct, DistinguishedName, SignatureScheme};
+use std::fmt::{Debug, Formatter};
 
 pub struct ClientVerifier;
 

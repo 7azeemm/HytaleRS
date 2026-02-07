@@ -1,7 +1,3 @@
-use std::sync::Arc;
-use log::info;
-use protocol::io::codecs::VarList;
-use protocol::packets::setup::{Asset, RequestAssets, ServerInfo, WorldLoadFinished, WorldLoadProgress, WorldSettings};
 use crate::assets::asset_registry::STORE_REGISTRY;
 use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
 use crate::config::WORLD_HEIGHT;
@@ -10,14 +6,25 @@ use crate::net::connection_manager::ConnectionContext;
 use crate::net::handlers::handshake_handler::PlayerAuthentication;
 use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
 use crate::server::HytaleServer;
+use log::info;
+use protocol::io::codecs::VarList;
+use protocol::packets::setup::{
+    Asset, RequestAssets, ServerInfo, WorldLoadFinished, WorldLoadProgress, WorldSettings,
+};
+use std::sync::Arc;
 
 pub struct SetupHandler {
-    pub player_auth: PlayerAuthentication
+    pub player_auth: PlayerAuthentication,
 }
 
 #[async_trait::async_trait]
 impl PacketHandler for SetupHandler {
-    async fn handle(&mut self, packet_id: u32, data: &[u8], cx: &mut ConnectionContext) -> HandlerAction {
+    async fn handle(
+        &mut self,
+        packet_id: u32,
+        data: &[u8],
+        cx: &mut ConnectionContext,
+    ) -> HandlerAction {
         match packet_id {
             23 => handle_packet!(self, RequestAssets, data, handle_request_assets, cx),
             _ => HandlerAction::Error(format!("Unexpected packet {} in setup", packet_id)),
@@ -39,19 +46,25 @@ impl PacketHandler for SetupHandler {
 
         cx.send(WorldSettings {
             world_height: WORLD_HEIGHT,
-            required_assets
-        }).await;
-        
+            required_assets,
+        })
+        .await;
+
         cx.send(ServerInfo {
             max_players,
             server_name: Some(server_name),
-            motd: Some(motd)
-        }).await;
+            motd: Some(motd),
+        })
+        .await;
     }
 }
 
 impl SetupHandler {
-    async fn handle_request_assets(&self, packet: RequestAssets, cx: &mut ConnectionContext) -> HandlerAction {
+    async fn handle_request_assets(
+        &self,
+        packet: RequestAssets,
+        cx: &mut ConnectionContext,
+    ) -> HandlerAction {
         info!("Client requested {} assets", packet.assets.len());
 
         STORE_REGISTRY.send_assets(cx).await;
@@ -59,8 +72,9 @@ impl SetupHandler {
         cx.send(WorldLoadProgress {
             status: "Loading World".to_owned(),
             percent_complete: 0,
-            percent_complete_subitem: 0
-        }).await;
+            percent_complete_subitem: 0,
+        })
+        .await;
         cx.send(WorldLoadFinished {}).await;
 
         HandlerAction::Continue

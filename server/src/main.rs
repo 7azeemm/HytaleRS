@@ -1,22 +1,22 @@
-use std::sync::LazyLock;
-use std::time::Instant;
-use log::info;
-use server::HytaleServer;
-use utils::hytale_logger::Logger;
-use utils::options;
 use crate::assets::asset_module::ASSET_MODULE;
 use crate::assets::asset_registry::STORE_REGISTRY;
 use crate::assets::common::common_module::COMMON_ASSET_MODULE;
 use crate::net::server_network_manager::ServerNetworkManager;
+use log::info;
+use server::HytaleServer;
+use std::sync::LazyLock;
+use std::time::Instant;
+use utils::hytale_logger::Logger;
+use utils::options;
 
-pub mod server;
-pub mod config;
-pub mod utils;
-pub mod command;
-pub mod event;
-pub mod plugin;
-pub mod net;
 pub mod assets;
+pub mod command;
+pub mod config;
+pub mod event;
+pub mod net;
+pub mod plugin;
+pub mod server;
+pub mod utils;
 
 #[tokio::main]
 async fn main() {

@@ -1,3 +1,6 @@
+use crate::io::decoder::Decoder;
+use crate::io::encoder::Encoder;
+use crate::io::errors::{PacketError, PacketResult};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -5,9 +8,6 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::io::decoder::Decoder;
-use crate::io::encoder::Encoder;
-use crate::io::errors::{PacketError, PacketResult};
 
 const MAX_STRING_LENGTH: usize = 4_096_000;
 
@@ -16,7 +16,9 @@ pub trait PacketCodec: Sized + Debug {
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()>;
     fn decode(dec: &mut Decoder) -> PacketResult<Self>;
-    fn has_value(&self) -> bool { true }
+    fn has_value(&self) -> bool {
+        true
+    }
 }
 
 impl PacketCodec for u8 {
@@ -72,8 +74,7 @@ impl PacketCodec for u64 {
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let bytes = dec.read_bytes(8)?;
         Ok(u64::from_le_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
     }
 }
@@ -131,8 +132,7 @@ impl PacketCodec for i64 {
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let bytes = dec.read_bytes(8)?;
         Ok(i64::from_le_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
     }
 }
@@ -151,7 +151,10 @@ impl PacketCodec for bool {
         match bytes[0] {
             0 => Ok(false),
             1 => Ok(true),
-            v => Err(PacketError::DecodeError(format!("Invalid boolean value: {}", v))),
+            v => Err(PacketError::DecodeError(format!(
+                "Invalid boolean value: {}",
+                v
+            ))),
         }
     }
 }
@@ -181,8 +184,7 @@ impl PacketCodec for f64 {
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let bytes = dec.read_bytes(8)?;
         Ok(f64::from_le_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]))
     }
 }
@@ -207,9 +209,10 @@ impl PacketCodec for String {
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
         if len > MAX_STRING_LENGTH {
-            return Err(PacketError::EncodeError(
-                format!("String length {} exceeds maximum of {} while encoding", len, MAX_STRING_LENGTH)
-            ));
+            return Err(PacketError::EncodeError(format!(
+                "String length {} exceeds maximum of {} while encoding",
+                len, MAX_STRING_LENGTH
+            )));
         }
 
         enc.write_varint(len)?;
@@ -220,15 +223,17 @@ impl PacketCodec for String {
     fn decode(decoder: &mut Decoder) -> PacketResult<Self> {
         let len = decoder.read_varint()?;
         if len < 0 {
-            return Err(PacketError::DecodeError(
-                format!("String length {} is negative while decoding", len)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "String length {} is negative while decoding",
+                len
+            )));
         }
 
         if len > MAX_STRING_LENGTH {
-            return Err(PacketError::DecodeError(
-                format!("String length {} exceeds maximum of {} while decoding", len, MAX_STRING_LENGTH)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "String length {} exceeds maximum of {} while decoding",
+                len, MAX_STRING_LENGTH
+            )));
         }
 
         let bytes = decoder.read_bytes(len)?;
@@ -246,9 +251,10 @@ impl<const MAX: usize> PacketCodec for VarString<MAX> {
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
         if len > MAX {
-            return Err(PacketError::EncodeError(
-                format!("VarString length {} exceeds maximum of {} while encoding", len, MAX)
-            ));
+            return Err(PacketError::EncodeError(format!(
+                "VarString length {} exceeds maximum of {} while encoding",
+                len, MAX
+            )));
         }
 
         enc.write_varint(len)?;
@@ -259,15 +265,17 @@ impl<const MAX: usize> PacketCodec for VarString<MAX> {
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let len = dec.read_varint()?;
         if len < 0 {
-            return Err(PacketError::DecodeError(
-                format!("VarString length {} is negative while decoding", len)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "VarString length {} is negative while decoding",
+                len
+            )));
         }
 
         if len > MAX {
-            return Err(PacketError::DecodeError(
-                format!("VarString length {} exceeds maximum of {} while decoding", len, MAX)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "VarString length {} exceeds maximum of {} while decoding",
+                len, MAX
+            )));
         }
 
         let bytes = dec.read_bytes(len)?;
@@ -323,9 +331,10 @@ impl<const N: usize> PacketCodec for FixedString<N> {
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
         if len > N {
-            return Err(PacketError::EncodeError(
-                format!("FixedString length {} exceeds maximum of {} while encoding", len, N)
-            ));
+            return Err(PacketError::EncodeError(format!(
+                "FixedString length {} exceeds maximum of {} while encoding",
+                len, N
+            )));
         }
 
         enc.write_bytes(self.0.as_bytes());
@@ -398,7 +407,7 @@ impl<T: PacketCodec> PacketCodec for Vec<T> {
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         if !dec.read_null_bit() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         let len = dec.read_varint()?;
@@ -427,9 +436,10 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
 
         if len > 0 {
             if len > MAX {
-                return Err(PacketError::EncodeError(
-                    format!("VarList length {} exceeds maximum of {} while encoding", len, MAX)
-                ));
+                return Err(PacketError::EncodeError(format!(
+                    "VarList length {} exceeds maximum of {} while encoding",
+                    len, MAX
+                )));
             }
 
             enc.write_varint(len)?;
@@ -442,20 +452,22 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         if !dec.read_null_bit() {
-            return Ok(Self(Vec::new()))
+            return Ok(Self(Vec::new()));
         }
 
         let len = dec.read_varint()?;
         if len < 0 {
-            return Err(PacketError::DecodeError(
-                format!("VarList length {} is negative while decoding", len)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "VarList length {} is negative while decoding",
+                len
+            )));
         }
 
         if len > MAX {
-            return Err(PacketError::DecodeError(
-                format!("VarList length {} exceeds maximum of {} while decoding", len, MAX)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "VarList length {} exceeds maximum of {} while decoding",
+                len, MAX
+            )));
         }
 
         let mut items = Vec::with_capacity(len);
@@ -527,7 +539,7 @@ impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         if !dec.read_null_bit() {
-            return Ok(HashMap::new())
+            return Ok(HashMap::new());
         }
 
         let len = dec.read_varint()?;
@@ -553,7 +565,7 @@ impl<T: PacketCodec> PacketCodec for Option<T> {
 
         match self {
             Some(v) => v.encode(enc),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 

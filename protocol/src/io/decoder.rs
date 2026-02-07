@@ -1,4 +1,3 @@
-use log::info;
 use crate::io::codecs::PacketCodec;
 use crate::io::errors::{PacketError, PacketResult};
 use crate::io::packet::PacketLayout;
@@ -25,9 +24,10 @@ impl<'a> Offsets<'a> {
     fn read_offset(&mut self, field: &'static str) -> PacketResult<i32> {
         let buf = self.buf.as_mut().unwrap();
         if buf.len() < 4 {
-            return Err(PacketError::DecodeError(
-                format!("Offset out of bounds while reading field '{}'", field)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "Offset out of bounds while reading field '{}'",
+                field
+            )));
         }
 
         let pos = self.pos;
@@ -35,7 +35,9 @@ impl<'a> Offsets<'a> {
         self.pos += 4;
 
         let offset = i32::from_le_bytes(offset_bytes.try_into().unwrap());
-        if offset == -1 { return Ok(-1) }
+        if offset == -1 {
+            return Ok(-1);
+        }
 
         Ok((self.start_pos + self.size) as i32 + offset)
     }
@@ -50,7 +52,9 @@ impl<'a> Scope<'a> {
     fn new(dec: &mut Decoder<'a>, pos: usize, layout: &PacketLayout) -> Self {
         let null_bits_size = (layout.var_field_count + 7) / 8;
 
-        let null_bits = if null_bits_size == 0 { None } else {
+        let null_bits = if null_bits_size == 0 {
+            None
+        } else {
             dec.pos += null_bits_size;
             Some(NullBits {
                 buf: &dec.buf[pos..pos + null_bits_size],
@@ -58,12 +62,14 @@ impl<'a> Scope<'a> {
             })
         };
 
-        let offsets = if layout.var_field_count <= 1 { None } else {
-            Some(Offsets{
+        let offsets = if layout.var_field_count <= 1 {
+            None
+        } else {
+            Some(Offsets {
                 buf: None,
                 pos: 0,
                 start_pos: pos + null_bits_size + layout.fixed_block_size,
-                size: layout.var_field_count * 4
+                size: layout.var_field_count * 4,
             })
         };
 
@@ -74,19 +80,25 @@ impl<'a> Scope<'a> {
 impl<'a> Decoder<'a> {
     pub fn new(buf: &'a [u8], layout: &PacketLayout) -> PacketResult<Self> {
         let null_bits_size = (layout.var_field_count + 7) / 8;
-        let offsets_size = if layout.var_field_count > 1 { layout.var_field_count * 4 } else { 0 };
+        let offsets_size = if layout.var_field_count > 1 {
+            layout.var_field_count * 4
+        } else {
+            0
+        };
 
         let min_size = null_bits_size + layout.fixed_block_size + offsets_size;
         if buf.len() < min_size {
-            return Err(PacketError::Error(
-                format!("Packet too small: expected at least {}, got {}", min_size, buf.len())
-            ));
+            return Err(PacketError::Error(format!(
+                "Packet too small: expected at least {}, got {}",
+                min_size,
+                buf.len()
+            )));
         }
 
         let mut dec = Decoder {
             scopes: vec![],
             pos: 0,
-            buf
+            buf,
         };
 
         let scope = Scope::new(&mut dec, 0, layout);
@@ -159,13 +171,16 @@ impl<'a> Decoder<'a> {
     }
 
     fn move_to(&mut self, new_pos: i32, field: &'static str) -> PacketResult<()> {
-        if new_pos == -1 { return Ok(()) }
+        if new_pos == -1 {
+            return Ok(());
+        }
         let new_pos = new_pos as usize;
 
         if new_pos >= self.buf.len() {
-            return Err(PacketError::DecodeError(
-                format!("Offset {} out of bounds for variable field '{}'", new_pos, field)
-            ));
+            return Err(PacketError::DecodeError(format!(
+                "Offset {} out of bounds for variable field '{}'",
+                new_pos, field
+            )));
         }
 
         self.pos = new_pos;

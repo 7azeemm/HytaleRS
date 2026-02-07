@@ -1,19 +1,19 @@
-use std::error::Error;
-use aes_gcm::aead::{Aead, KeyInit, Nonce};
+use crate::server::HytaleServer;
+use crate::utils::hardware_utils::get_system_uuid;
 use aes_gcm::Aes256Gcm;
+use aes_gcm::aead::{Aead, KeyInit, Nonce};
+use chrono::{DateTime, Utc};
+use log::{error, info};
 use pbkdf2::pbkdf2_hmac;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use log::{error, info};
-use rand::RngCore;
 use tokio::sync::Mutex;
-use crate::server::HytaleServer;
-use crate::utils::hardware_utils::get_system_uuid;
+use uuid::Uuid;
 
 const ALGORITHM: &str = "AES/GCM/NoPadding";
 const SALT: &[u8] = b"HytaleAuthCredentialStore";
@@ -28,7 +28,7 @@ pub struct CredentialStore {
     path: PathBuf,
     encryption_key: [u8; KEY_LENGTH],
     pub(crate) tokens: Mutex<Option<AuthTokens>>,
-    pub profile: Mutex<Option<String>>
+    pub profile: Mutex<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,13 +53,20 @@ pub struct AuthTokens {
 impl CredentialStore {
     pub async fn new() -> Self {
         let encryption_key = Self::derive_key().await;
-        let path = PathBuf::from(HytaleServer::get().config.read().await.auth_credential_store_path.clone());
+        let path = PathBuf::from(
+            HytaleServer::get()
+                .config
+                .read()
+                .await
+                .auth_credential_store_path
+                .clone(),
+        );
 
         Self {
             path,
             encryption_key,
             tokens: Mutex::new(None),
-            profile: Mutex::new(None)
+            profile: Mutex::new(None),
         }
     }
 
@@ -97,12 +104,17 @@ impl CredentialStore {
     }
 
     pub async fn load(&self) {
-        if !self.path.exists() { return }
+        if !self.path.exists() {
+            return;
+        }
 
         let bytes = match fs::read(&self.path) {
             Ok(b) => b,
             Err(err) => {
-                error!("Failed to load server credentials from {:?}: {}", self.path, err);
+                error!(
+                    "Failed to load server credentials from {:?}: {}",
+                    self.path, err
+                );
                 return;
             }
         };
@@ -119,14 +131,18 @@ impl CredentialStore {
         };
 
         match bson::deserialize_from_slice::<StoredAuthTokens>(&decrypted) {
-            Err(e) => error!("Failed to parse server credentials from {:?}: {}", self.path, e),
+            Err(e) => error!(
+                "Failed to parse server credentials from {:?}: {}",
+                self.path, e
+            ),
             Ok(stored_tokens) => {
                 *self.profile.lock().await = stored_tokens.profile_uuid;
                 self.update_tokens(AuthTokens {
                     access_token: stored_tokens.access_token,
                     refresh_token: stored_tokens.refresh_token,
-                    expires_at: stored_tokens.expires_at
-                }).await;
+                    expires_at: stored_tokens.expires_at,
+                })
+                .await;
                 info!("Loaded server credentials successfully");
             }
         }
@@ -135,14 +151,14 @@ impl CredentialStore {
     pub async fn save(&self) -> Result<(), Box<dyn Error>> {
         let lock = self.tokens.lock().await;
         let Some(tokens) = &*lock else {
-            return Err("No tokens available to save.".into())
+            return Err("No tokens available to save.".into());
         };
 
         let stored_tokens = StoredAuthTokens {
             access_token: tokens.access_token.clone(),
             refresh_token: tokens.refresh_token.clone(),
             expires_at: tokens.expires_at,
-            profile_uuid: self.profile.lock().await.clone()
+            profile_uuid: self.profile.lock().await.clone(),
         };
 
         let plaintext = bson::serialize_to_vec(&stored_tokens)?;
@@ -159,7 +175,9 @@ impl CredentialStore {
 
         rand::rng().fill_bytes(&mut iv);
         let nonce = aes_gcm::Nonce::try_from(iv).map_err(|e| e.to_string())?;
-        let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|e| e.to_string())?;
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext)
+            .map_err(|e| e.to_string())?;
 
         let mut result = Vec::with_capacity(IV_LENGTH + ciphertext.len());
         result.extend_from_slice(&iv);
@@ -177,7 +195,8 @@ impl CredentialStore {
         let (iv, ciphertext) = encrypted.split_at(IV_LENGTH);
         let nonce = aes_gcm::Nonce::try_from(iv).map_err(|e| e.to_string())?;
 
-        cipher.decrypt(&nonce, ciphertext)
+        cipher
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| e.to_string().into())
     }
 }

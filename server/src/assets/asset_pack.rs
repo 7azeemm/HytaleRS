@@ -1,3 +1,12 @@
+use crate::assets::asset_reader::ZipReader;
+use crate::assets::asset_registry::STORE_REGISTRY;
+use crate::assets::asset_store::StoreBase;
+use crate::assets::common::common_asset::FileCommonAsset;
+use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
+use crate::assets::errors::{AssetError, AssetResult};
+use crate::plugin::plugin_manifest::PluginManifest;
+use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use log::{error, info, warn};
 use std::any::{Any, TypeId};
 use std::collections::VecDeque;
 use std::error::Error;
@@ -8,16 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
-use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
-use log::{error, info, warn};
 use zip::ZipArchive;
-use crate::assets::asset_reader::ZipReader;
-use crate::assets::asset_registry::STORE_REGISTRY;
-use crate::assets::asset_store::StoreBase;
-use crate::assets::common::common_asset::FileCommonAsset;
-use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
-use crate::assets::errors::{AssetError, AssetResult};
-use crate::plugin::plugin_manifest::PluginManifest;
 
 pub struct AssetPack {
     name: String,
@@ -39,8 +39,10 @@ impl AssetPack {
 
         let mut reader = ZipReader::open(path, file_name)?;
 
-        let manifest = serde_json::from_slice::<PluginManifest>(&reader.read_file("manifest.json")?)
-            .map_err(|err| AssetError::IoError(format!("Failed to parse pack manifest: {}", err)))?;
+        let manifest = serde_json::from_slice::<PluginManifest>(
+            &reader.read_file("manifest.json")?,
+        )
+        .map_err(|err| AssetError::IoError(format!("Failed to parse pack manifest: {}", err)))?;
 
         let immutable = file_name.ends_with(".zip") || file_name.ends_with(".jar");
         let name = format!("{}:{}", manifest.group, manifest.name);
@@ -52,7 +54,7 @@ impl AssetPack {
             path: path.clone(),
             reader: Arc::new(reader),
             manifest,
-            immutable
+            immutable,
         })
     }
 
@@ -69,13 +71,21 @@ impl AssetPack {
         let start = Instant::now();
 
         // Try to read hashes file
-        let content = match self.reader.read_file("CommonAssetsIndex.hashes")
-            .and_then(|b| str::from_utf8(&b)
-                .map(|s| s.to_string())
-                .map_err(|err| AssetError::IoError(err.to_string()))) {
+        let content = match self
+            .reader
+            .read_file("CommonAssetsIndex.hashes")
+            .and_then(|b| {
+                str::from_utf8(&b)
+                    .map(|s| s.to_string())
+                    .map_err(|err| AssetError::IoError(err.to_string()))
+            }) {
             Ok(s) => s,
             Err(err) => {
-                log::error!("Failed to read CommonAssetsIndex.hashes in pack '{}': {}", self.name, err);
+                log::error!(
+                    "Failed to read CommonAssetsIndex.hashes in pack '{}': {}",
+                    self.name,
+                    err
+                );
                 return;
             }
         };
@@ -87,7 +97,10 @@ impl AssetPack {
             let hash = match split.next() {
                 Some(h) if h.len() == 64 => h,
                 _ => {
-                    warn!("Corrupt line in CommonAssetsIndex.hashes:L{} '{}'", line_number, line);
+                    warn!(
+                        "Corrupt line in CommonAssetsIndex.hashes:L{} '{}'",
+                        line_number, line
+                    );
                     continue;
                 }
             };
@@ -95,7 +108,10 @@ impl AssetPack {
             let name = match split.next() {
                 Some(n) => n,
                 None => {
-                    warn!("Corrupt line in CommonAssetsIndex.hashes:L{} '{}'", line_number, line);
+                    warn!(
+                        "Corrupt line in CommonAssetsIndex.hashes:L{} '{}'",
+                        line_number, line
+                    );
                     continue;
                 }
             };
@@ -104,7 +120,7 @@ impl AssetPack {
                 name: name.to_owned(),
                 hash: hash.to_owned(),
                 path: format!("Common/{}", name),
-                pack: self.name.clone()
+                pack: self.name.clone(),
             };
 
             COMMON_ASSET_REGISTRY.add_common_asset(asset);
@@ -112,7 +128,11 @@ impl AssetPack {
             loaded_count += 1;
         }
 
-        info!("Took {:.2?} to load {} assets from CommonAssetsIndex.hashes file.", start.elapsed(), loaded_count);
+        info!(
+            "Took {:.2?} to load {} assets from CommonAssetsIndex.hashes file.",
+            start.elapsed(),
+            loaded_count
+        );
     }
 }
 
@@ -134,7 +154,11 @@ pub fn sort_stores(stores: Vec<Arc<dyn StoreBase>>) -> Vec<Arc<dyn StoreBase>> {
 
         for &dep in store.dependencies() {
             if !by_type.contains_key(&dep) {
-                panic!("Store `{}` depends on missing store {:?}", store.name(), dep);
+                panic!(
+                    "Store `{}` depends on missing store {:?}",
+                    store.name(),
+                    dep
+                );
             }
 
             *in_degree.get_mut(&store_ty).unwrap() += 1;

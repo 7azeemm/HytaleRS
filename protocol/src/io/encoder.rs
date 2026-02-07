@@ -1,8 +1,8 @@
-use std::mem::take;
+use crate::io::MAX_VARINT;
 use crate::io::codecs::PacketCodec;
 use crate::io::errors::{PacketError, PacketResult};
-use crate::io::MAX_VARINT;
 use crate::io::packet::PacketLayout;
+use std::mem::take;
 
 pub struct Encoder {
     buf: Vec<u8>,
@@ -29,22 +29,26 @@ struct Scope {
 
 impl Scope {
     fn new(pos: usize, layout: &PacketLayout) -> Self {
-        let null_bits = if layout.var_field_count == 0 { None } else {
+        let null_bits = if layout.var_field_count == 0 {
+            None
+        } else {
             Some(NullBits {
                 buf: Vec::new(),
                 index: 0,
                 current_byte: 0,
-                pos
+                pos,
             })
         };
 
-        let offsets = if layout.var_field_count <= 1 { None } else {
+        let offsets = if layout.var_field_count <= 1 {
+            None
+        } else {
             let null_bits_size = (layout.var_field_count + 7) / 8;
             let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
             Some(Offsets {
                 buf: Vec::new(),
                 pos: offsets_pos,
-                var_pos: pos + layout.fixed_block_size
+                var_pos: pos + layout.fixed_block_size,
             })
         };
 

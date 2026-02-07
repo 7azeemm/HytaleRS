@@ -1,7 +1,7 @@
+use num_enum::TryFromPrimitiveError;
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::string::FromUtf8Error;
-use num_enum::TryFromPrimitiveError;
 
 #[derive(Debug, Clone)]
 pub enum PacketError {
@@ -34,7 +34,9 @@ impl From<std::io::Error> for PacketError {
     }
 }
 
-impl<T: Debug + num_enum::TryFromPrimitive<Primitive = u8>> From<TryFromPrimitiveError<T>> for PacketError {
+impl<T: Debug + num_enum::TryFromPrimitive<Primitive = u8>> From<TryFromPrimitiveError<T>>
+    for PacketError
+{
     fn from(err: TryFromPrimitiveError<T>) -> Self {
         PacketError::DecodeError(format!("Invalid enum value: {:?}", err))
     }

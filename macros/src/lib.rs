@@ -1,9 +1,9 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse_macro_input, DeriveInput, Data, Error, Result, Fields};
+use quote::{ToTokens, quote};
 use syn::parse::Parser;
+use syn::{Data, DeriveInput, Error, Fields, Result, parse_macro_input};
 
 #[derive(Default)]
 struct PacketAttrs {
@@ -68,17 +68,15 @@ pub fn packet(args: TokenStream, input: TokenStream) -> TokenStream {
     let struct_name = &input.ident;
 
     let Some(id) = attrs.id else {
-        return Error::new(
-            proc_macro2::Span::call_site(),
-            "missing `id`",
-        ).to_compile_error().into()
+        return Error::new(proc_macro2::Span::call_site(), "missing `id`")
+            .to_compile_error()
+            .into();
     };
 
     let Some(max_size) = attrs.max_size else {
-        return Error::new(
-            proc_macro2::Span::call_site(),
-            "missing `max_size`",
-        ).to_compile_error().into()
+        return Error::new(proc_macro2::Span::call_site(), "missing `max_size`")
+            .to_compile_error()
+            .into();
     };
 
     let compressed = attrs.compressed;
@@ -87,13 +85,17 @@ pub fn packet(args: TokenStream, input: TokenStream) -> TokenStream {
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => fields.named.iter().collect::<Vec<_>>(),
-            _ => return Error::new_spanned(struct_name, "packet must have named fields")
-                .to_compile_error()
-                .into(),
+            _ => {
+                return Error::new_spanned(struct_name, "packet must have named fields")
+                    .to_compile_error()
+                    .into();
+            }
         },
-        _ => return Error::new_spanned(struct_name, "packet must be a struct")
-            .to_compile_error()
-            .into(),
+        _ => {
+            return Error::new_spanned(struct_name, "packet must be a struct")
+                .to_compile_error()
+                .into();
+        }
     };
 
     let field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap()).collect();
@@ -157,7 +159,7 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
         _ => {
             return Error::new_spanned(input, "packet_field can only be applied to structs")
                 .to_compile_error()
-                .into()
+                .into();
         }
     };
 
@@ -237,15 +239,15 @@ pub fn packet_enum(_args: TokenStream, input: TokenStream) -> TokenStream {
                         variant,
                         "packet_enum only supports unit variants (no fields)",
                     )
-                        .to_compile_error()
-                        .into();
+                    .to_compile_error()
+                    .into();
                 }
             }
         }
         _ => {
             return Error::new_spanned(input, "packet_enum can only be applied to enums")
                 .to_compile_error()
-                .into()
+                .into();
         }
     };
 

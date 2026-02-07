@@ -1,18 +1,20 @@
-use std::any::{type_name, Any, TypeId};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
-use std::time::Instant;
+use crate::assets::asset_reader::ZipReader;
+use crate::assets::asset_type::{Asset, AssetType};
+use crate::assets::structs::{ParsedAsset, PendingAsset, StoreStats};
+use crate::net::connection_manager::ConnectionContext;
 use async_trait::async_trait;
 use futures::future::join_all;
 use log::{info, warn};
 use parking_lot::{Mutex, RwLock};
 use rayon::iter::Either;
-use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::prelude::{
+    IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 use serde_json::Value;
-use crate::assets::asset_reader::ZipReader;
-use crate::assets::asset_type::{Asset, AssetType};
-use crate::assets::structs::{ParsedAsset, PendingAsset, StoreStats};
-use crate::net::connection_manager::ConnectionContext;
+use std::any::{Any, TypeId, type_name};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
+use std::time::Instant;
 
 #[async_trait]
 pub trait StoreBase: Any + Send + Sync + 'static {
@@ -44,7 +46,12 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
         }
     }
 
-    async fn decode_assets(self: Arc<Self>, pending: Vec<PendingAsset>, reader: &Arc<ZipReader>, pack: &str) {
+    async fn decode_assets(
+        self: Arc<Self>,
+        pending: Vec<PendingAsset>,
+        reader: &Arc<ZipReader>,
+        pack: &str,
+    ) {
         info!("Decoding {} assets of store {}", pending.len(), self.name());
         let start = Instant::now();
         let initial_len = pending.len();
@@ -52,28 +59,28 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
         // STEP 1: Read and parse all files
         let parsed: Vec<ParsedAsset> = pending
             .into_par_iter()
-            .filter_map(|asset| {
-                match reader.read_file(&asset.path) {
-                    Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
-                        Ok(json) => Some(ParsedAsset {
-                            key: asset.key,
-                            path: asset.path,
-                            parent: json.get("Parent").and_then(|v| v.as_str()).map(String::from),
-                            value: json,
-                        }),
-                        Err(err) => {
-                            warn!("Failed to parse asset file {}: {}", asset.path, err);
-                            None
-                        }
-                    },
+            .filter_map(|asset| match reader.read_file(&asset.path) {
+                Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
+                    Ok(json) => Some(ParsedAsset {
+                        key: asset.key,
+                        path: asset.path,
+                        parent: json
+                            .get("Parent")
+                            .and_then(|v| v.as_str())
+                            .map(String::from),
+                        value: json,
+                    }),
                     Err(err) => {
-                        warn!("Failed to read asset file {}: {}", asset.path, err);
+                        warn!("Failed to parse asset file {}: {}", asset.path, err);
                         None
                     }
+                },
+                Err(err) => {
+                    warn!("Failed to read asset file {}: {}", asset.path, err);
+                    None
                 }
             })
             .collect();
-
 
         self.stats.write().failed += initial_len - parsed.len();
 
@@ -112,7 +119,11 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
                     .map(|a| format!("{} (needs {})", a.key, a.parent.as_ref().unwrap()))
                     .collect();
 
-                warn!("Unresolved {} asset parent dependencies: {}", still_waiting.len(), missing.join(", "));
+                warn!(
+                    "Unresolved {} asset parent dependencies: {}",
+                    still_waiting.len(),
+                    missing.join(", ")
+                );
 
                 for asset in still_waiting {
                     self.orphans.write().insert(asset.key);
@@ -126,8 +137,8 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
 
         let (valid_assets, failed_count): (Vec<_>, Vec<_>) = ready_assets
             .into_par_iter()
-            .partition_map(|(id, (path, json))| {
-                match serde_json::from_value::<T>(json) {
+            .partition_map(
+                |(id, (path, json))| match serde_json::from_value::<T>(json) {
                     Ok(mut asset) => {
                         asset.set_id(id.clone());
                         Either::Left((id, path, asset))
@@ -136,8 +147,8 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
                         warn!("Failed to deserialize asset {}: {}", id, err);
                         Either::Right(())
                     }
-                }
-            });
+                },
+            );
 
         let valid_assets_len = valid_assets.len();
         self.stats.write().loaded += valid_assets_len;
@@ -148,7 +159,13 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
             assets_lock.insert(id, Asset::new(asset, pack.to_owned(), path));
         }
 
-        info!("Decoded {}/{} assets of store {} in {:.2?}", valid_assets_len, initial_len, self.name(), start.elapsed());
+        info!(
+            "Decoded {}/{} assets of store {} in {:.2?}",
+            valid_assets_len,
+            initial_len,
+            self.name(),
+            start.elapsed()
+        );
         self.print_stats();
     }
 
@@ -189,7 +206,11 @@ impl<T: AssetType + 'static> StoreBase for AssetStore<T> {
 
         let mut raw_assets = Vec::with_capacity(paths.len());
         for path in paths {
-            match path.split('/').last().and_then(|s| s.strip_suffix(T::extension())) {
+            match path
+                .split('/')
+                .last()
+                .and_then(|s| s.strip_suffix(T::extension()))
+            {
                 Some(key) => raw_assets.push(PendingAsset {
                     key: key.to_owned(),
                     path: path.to_owned(),

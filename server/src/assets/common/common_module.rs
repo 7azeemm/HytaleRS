@@ -1,17 +1,16 @@
-use std::sync::LazyLock;
 use crate::assets::asset_module::ASSET_MODULE;
 use crate::event::event_bus::EVENT_BUS;
 use crate::event::events::load_asset_event::LoadAssetEvent;
+use std::sync::LazyLock;
 
-pub static COMMON_ASSET_MODULE: LazyLock<CommonAssetModule> = LazyLock::new(|| CommonAssetModule::new());
+pub static COMMON_ASSET_MODULE: LazyLock<CommonAssetModule> =
+    LazyLock::new(|| CommonAssetModule::new());
 
-pub struct CommonAssetModule {
-}
+pub struct CommonAssetModule {}
 
 impl CommonAssetModule {
     fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 
     pub async fn init(&self) {

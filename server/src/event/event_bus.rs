@@ -1,10 +1,10 @@
 use ahash::{HashMap, HashMapExt};
+use futures::Future;
 use parking_lot::RwLock;
 use std::any::{Any, TypeId};
 use std::pin::Pin;
-use std::sync::LazyLock;
 use std::sync::Arc;
-use futures::Future;
+use std::sync::LazyLock;
 
 pub static EVENT_BUS: LazyLock<EventBus> = LazyLock::new(|| EventBus::new());
 
@@ -65,9 +65,11 @@ impl EventBus {
         let type_id = TypeId::of::<E>();
         let priority = priority.unwrap_or(0);
 
-        let wrapped = Arc::new(move |event: &dyn Any| -> Pin<Box<dyn Future<Output = ()> + Send>> {
-            Box::pin(handler(event.downcast_ref::<E>().unwrap()))
-        });
+        let wrapped = Arc::new(
+            move |event: &dyn Any| -> Pin<Box<dyn Future<Output = ()> + Send>> {
+                Box::pin(handler(event.downcast_ref::<E>().unwrap()))
+            },
+        );
 
         let entry = Arc::new(HandlerEntry {
             handler: Handler::Async(wrapped),
@@ -85,7 +87,8 @@ impl EventBus {
         let type_id = TypeId::of::<E>();
 
         let handlers = {
-            self.handlers.read()
+            self.handlers
+                .read()
                 .get(&type_id)
                 .map(|h| h.clone())
                 .unwrap_or_default()
@@ -94,7 +97,7 @@ impl EventBus {
         for entry in handlers {
             match &entry.handler {
                 Handler::Sync(sync_handler) => sync_handler(event as &dyn Any),
-                Handler::Async(async_handler) => async_handler(event as &dyn Any).await
+                Handler::Async(async_handler) => async_handler(event as &dyn Any).await,
             }
         }
     }

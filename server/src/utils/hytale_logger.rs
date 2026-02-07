@@ -1,10 +1,10 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use chrono::Local;
+use colored::Colorize;
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use log::{Log, Metadata, Record};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::thread;
-use chrono::Local;
-use colored::Colorize;
-use log::{Log, Metadata, Record};
 
 pub struct Logger {
     sender: Sender<LogMessage>,
@@ -40,11 +40,7 @@ impl Logger {
             Local::now().format("%H-%M-%S")
         );
 
-        let mut file = match OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-        {
+        let mut file = match OpenOptions::new().create(true).append(true).open(&log_path) {
             Ok(f) => f,
             Err(e) => {
                 eprintln!("Failed to open log file: {}", e);
@@ -71,7 +67,10 @@ impl Logger {
                 _ => msg.level.normal().to_string(),
             };
 
-            println!("[{}] [{}] [{}] {}", msg.timestamp, level_colored, msg.target, msg.message);
+            println!(
+                "[{}] [{}] [{}] {}",
+                msg.timestamp, level_colored, msg.target, msg.message
+            );
         }
 
         let _ = file.flush();

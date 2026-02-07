@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use parking_lot::lock_api::RwLockReadGuard;
+use crate::assets::asset_type::{Asset, AssetType};
 use parking_lot::RawRwLock;
-use serde::{Deserialize, Serialize};
+use parking_lot::lock_api::RwLockReadGuard;
 use protocol::packets::assets::block_sets::UpdateBlockSets;
 use protocol::packets::assets::update_type::UpdateType;
-use crate::assets::asset_type::{Asset, AssetType};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
@@ -19,7 +19,7 @@ pub struct BlockSet {
     pub include_hitbox_types: Vec<String>,
     pub exclude_hitbox_types: Vec<String>,
     pub include_categories: Vec<Vec<String>>,
-    pub exclude_categories: Vec<Vec<String>>
+    pub exclude_categories: Vec<Vec<String>>,
 }
 
 impl AssetType for BlockSet {
@@ -45,13 +45,15 @@ impl AssetType for BlockSet {
         self.parent.as_deref()
     }
 
-    fn generate_init_packet(map: RwLockReadGuard<RawRwLock, HashMap<String, Asset<Self>>>) -> Self::InitPacketType {
+    fn generate_init_packet(
+        map: RwLockReadGuard<RawRwLock, HashMap<String, Asset<Self>>>,
+    ) -> Self::InitPacketType {
         let mut block_sets = HashMap::new();
 
         for (id, _) in map.iter() {
             let packet = protocol::packets::assets::block_sets::BlockSet {
                 name: Some(id.to_owned()),
-                blocks: vec![5, 8, 10].into()
+                blocks: vec![5, 8, 10].into(),
             };
 
             block_sets.insert(id.to_owned(), packet);
@@ -59,7 +61,7 @@ impl AssetType for BlockSet {
 
         UpdateBlockSets {
             update_type: UpdateType::Init,
-            block_sets
+            block_sets,
         }
     }
 }

@@ -19,8 +19,8 @@ impl RateLimiter {
             refill_rate,
             state: Mutex::new(RateLimiterState {
                 tokens: max_tokens,
-                last_refill: Instant::now()
-            })
+                last_refill: Instant::now(),
+            }),
         }
     }
 
@@ -32,7 +32,8 @@ impl RateLimiter {
         let now = Instant::now();
         let mut state = self.state.lock();
         let elapsed = now.duration_since(state.last_refill).as_secs_f64();
-        state.tokens = (state.tokens + (elapsed * self.refill_rate as f64) as u32).min(self.max_tokens);
+        state.tokens =
+            (state.tokens + (elapsed * self.refill_rate as f64) as u32).min(self.max_tokens);
         state.last_refill = now;
 
         // Try to consume token

@@ -1,8 +1,8 @@
-use std::process::Command;
-use std::fs;
-use uuid::Uuid;
-use regex::Regex;
 use once_cell::sync::Lazy;
+use regex::Regex;
+use std::fs;
+use std::process::Command;
+use uuid::Uuid;
 
 static UUID_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -14,20 +14,31 @@ pub fn get_system_uuid() -> Uuid {
         "windows" => get_uuid_windows(),
         "macos" => get_uuid_macos(),
         "linux" => get_uuid_linux(),
-        _ => panic!("Unknown OS!")
+        _ => panic!("Unknown OS!"),
     }
 }
 
 fn get_uuid_windows() -> Uuid {
     // Try registry
-    if let Some(output) = run_command(&["reg", "query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"]) {
+    if let Some(output) = run_command(&[
+        "reg",
+        "query",
+        "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+        "/v",
+        "MachineGuid",
+    ]) {
         if let Some(uuid) = parse_uuid_from_output(&output) {
             return uuid;
         }
     }
 
     // Try PowerShell
-    if let Some(output) = run_command(&["powershell", "-NoProfile", "-Command", "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID"]) {
+    if let Some(output) = run_command(&[
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID",
+    ]) {
         if let Some(uuid) = parse_uuid_from_output(&output) {
             return uuid;
         }
@@ -45,7 +56,8 @@ fn get_uuid_windows() -> Uuid {
 
 fn get_uuid_macos() -> Uuid {
     // Try ioreg
-    if let Some(output) = run_command(&["/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice"]) {
+    if let Some(output) = run_command(&["/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice"])
+    {
         if let Some(uuid) = parse_uuid_from_output(&output) {
             return uuid;
         }
@@ -100,9 +112,9 @@ fn run_command(cmd: &[&str]) -> Option<String> {
     }
 
     match command.output() {
-        Ok(output) if output.status.success() => {
-            String::from_utf8(output.stdout).ok().map(|s| s.trim().to_string())
-        }
+        Ok(output) if output.status.success() => String::from_utf8(output.stdout)
+            .ok()
+            .map(|s| s.trim().to_string()),
         _ => None,
     }
 }

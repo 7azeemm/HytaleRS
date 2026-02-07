@@ -1,8 +1,8 @@
+use clap::{Parser, ValueEnum};
+use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use clap::{Parser, ValueEnum};
-use once_cell::sync::OnceCell;
 
 static OPTIONS: OnceCell<Options> = OnceCell::new();
 
@@ -17,16 +17,30 @@ pub struct Options {
     #[arg(long, help = "Prints version information.")]
     pub version: bool,
 
-    #[arg(long, help = "Runs the server bare. For example without loading worlds, binding to ports or creating directories. (Note: Plugins will still be loaded which may not respect this flag)")]
+    #[arg(
+        long,
+        help = "Runs the server bare. For example without loading worlds, binding to ports or creating directories. (Note: Plugins will still be loaded which may not respect this flag)"
+    )]
     pub bare: bool,
 
     #[arg(long, value_delimiter = ',', help = "Sets the logger level.")]
     pub log: Vec<String>,
 
-    #[arg(short = 'b', long = "bind", default_value = "0.0.0.0:5520", help = "Port to listen on")]
+    #[arg(
+        short = 'b',
+        long = "bind",
+        default_value = "0.0.0.0:5520",
+        help = "Port to listen on"
+    )]
     pub bind: SocketAddr,
 
-    #[arg(short = 't', long = "transport", value_enum, default_value = "quic", help = "Transport type")]
+    #[arg(
+        short = 't',
+        long = "transport",
+        value_enum,
+        default_value = "quic",
+        help = "Transport type"
+    )]
     pub transport: TransportType,
 
     #[arg(long, help = "Disables building of compact prefab buffers")]
@@ -41,25 +55,43 @@ pub struct Options {
     #[arg(long, help = "Additional mods directories", value_parser = parse_dir, value_delimiter = ',')]
     pub mods: Vec<PathBuf>,
 
-    #[arg(long, help = "You acknowledge that loading early plugins is unsupported and may cause stability issues.")]
+    #[arg(
+        long,
+        help = "You acknowledge that loading early plugins is unsupported and may cause stability issues."
+    )]
     pub accept_early_plugins: bool,
 
     #[arg(long, help = "Additional early plugin directories to load from", value_parser = parse_dir, value_delimiter = ',')]
     pub early_plugins: Vec<PathBuf>,
 
-    #[arg(long, help = "Causes the server to exit with an error code if any assets are invalid.")]
+    #[arg(
+        long,
+        help = "Causes the server to exit with an error code if any assets are invalid."
+    )]
     pub validate_assets: bool,
 
-    #[arg(long, help = "Causes the server to exit with an error code if any prefabs are invalid.")]
+    #[arg(
+        long,
+        help = "Causes the server to exit with an error code if any prefabs are invalid."
+    )]
     pub validate_prefabs: Option<ValidationOption>,
 
-    #[arg(long, help = "Causes the server to exit with an error code if default world gen is invalid.")]
+    #[arg(
+        long,
+        help = "Causes the server to exit with an error code if default world gen is invalid."
+    )]
     pub validate_world_gen: bool,
 
-    #[arg(long, help = "Automatically shutdown the server after asset and/or prefab validation.")]
+    #[arg(
+        long,
+        help = "Automatically shutdown the server after asset and/or prefab validation."
+    )]
     pub shutdown_after_validate: bool,
 
-    #[arg(long, help = "Causes the server generate schema, save it into the assets directory and then exit")]
+    #[arg(
+        long,
+        help = "Causes the server generate schema, save it into the assets directory and then exit"
+    )]
     pub generate_schema: bool,
 
     #[arg(long, help = "World gen directory", value_parser = parse_dir)]
@@ -91,7 +123,6 @@ pub struct Options {
 
     // #[arg(long, help = "Owner UUID")]
     // pub owner_uuid: Option<String>,
-
     #[arg(long, help = "Client PID")]
     pub client_pid: Option<u32>,
 
@@ -110,12 +141,15 @@ pub struct Options {
     #[arg(long, help = "Worlds to migrate", value_delimiter = ',')]
     pub migrate_worlds: Vec<String>,
 
-    #[arg(long, help = "Runs command on boot. If multiple commands are provided they are executed synchronously in order.", value_delimiter = ',')]
+    #[arg(
+        long,
+        help = "Runs command on boot. If multiple commands are provided they are executed synchronously in order.",
+        value_delimiter = ','
+    )]
     pub boot_command: Vec<String>,
 
     #[arg(long, help = "Allow self op command")]
     pub allow_op: bool,
-
     // #[arg(long, help = "Session token for Session Service API")]
     // pub session_token: Option<String>,
 
@@ -130,7 +164,9 @@ impl Options {
 }
 
 pub fn parse() {
-    OPTIONS.set(Options::parse()).expect("Failed to parse options");
+    OPTIONS
+        .set(Options::parse())
+        .expect("Failed to parse options");
 }
 
 fn parse_dir(path: &str) -> Result<PathBuf, String> {
@@ -160,8 +196,12 @@ fn parse_migrations(s: &str) -> Result<HashMap<String, PathBuf>, String> {
 
     for pair in s.split(',') {
         let mut kv = pair.splitn(2, '=');
-        let key = kv.next().ok_or_else(|| format!("Invalid migration entry: '{}'", pair))?;
-        let value = kv.next().ok_or_else(|| format!("Invalid migration entry: '{}'", pair))?;
+        let key = kv
+            .next()
+            .ok_or_else(|| format!("Invalid migration entry: '{}'", pair))?;
+        let value = kv
+            .next()
+            .ok_or_else(|| format!("Invalid migration entry: '{}'", pair))?;
 
         if map.contains_key(key) {
             return Err(format!("String '{}' has already been specified!", key));
@@ -181,7 +221,7 @@ fn parse_migrations(s: &str) -> Result<HashMap<String, PathBuf>, String> {
 #[derive(Debug, Clone, ValueEnum)]
 pub enum TransportType {
     TCP,
-    QUIC
+    QUIC,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -190,5 +230,5 @@ pub enum ValidationOption {
     Blocks,
     BlockStates,
     Entities,
-    BlockFiller
+    BlockFiller,
 }

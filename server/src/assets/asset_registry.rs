@@ -1,12 +1,12 @@
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::sync::{Arc, LazyLock};
-use log::{info, warn};
-use tokio::sync::RwLock;
 use crate::assets::asset_store::{AssetStore, StoreBase};
 use crate::assets::asset_type::AssetType;
 use crate::assets::types::block_set::block_set::BlockSet;
 use crate::net::connection_manager::ConnectionContext;
+use log::{info, warn};
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
+use tokio::sync::RwLock;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
 
@@ -49,10 +49,6 @@ impl StoreRegistry {
             .await
             .get(&TypeId::of::<T>())
             .cloned()
-            .and_then(|store| {
-                store.as_any_arc()
-                    .downcast::<AssetStore<T>>()
-                    .ok()
-            })
+            .and_then(|store| store.as_any_arc().downcast::<AssetStore<T>>().ok())
     }
 }

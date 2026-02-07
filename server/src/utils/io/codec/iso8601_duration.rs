@@ -1,5 +1,5 @@
-use std::fmt::Write;
 use serde::{Deserialize, Deserializer, Serializer};
+use std::fmt::Write;
 use std::time::Duration;
 
 pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
@@ -19,9 +19,9 @@ where
 }
 
 pub mod map {
+    use super::*;
     use ahash::HashMap;
     use serde::ser::SerializeMap;
-    use super::*;
 
     pub fn serialize<S>(map: &HashMap<String, Duration>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -98,7 +98,9 @@ fn parse_iso8601_duration(input: &str) -> Result<Duration, String> {
 }
 
 fn format_iso8601_duration(duration: &Duration) -> String {
-    if duration.is_zero() { return "PT0S".into(); }
+    if duration.is_zero() {
+        return "PT0S".into();
+    }
 
     let mut secs = duration.as_secs();
     let nanos = duration.subsec_nanos();
@@ -153,7 +155,8 @@ fn parse_u64_bytes(bytes: &[u8]) -> Result<u64, String> {
         if !(b'0'..=b'9').contains(&b) {
             return Err(format!("Invalid digit: {}", b as char));
         }
-        result = result.checked_mul(10)
+        result = result
+            .checked_mul(10)
             .and_then(|r| r.checked_add((b - b'0') as u64))
             .ok_or_else(|| "Number overflow".to_string())?;
     }

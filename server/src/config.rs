@@ -1,11 +1,11 @@
+use crate::plugin::plugin_identifier::PluginIdentifier;
 use crate::utils::io::codec::iso8601_duration;
-use std::time::{Duration, Instant};
+use crate::utils::io::json_config::JsonConfig;
 use ahash::HashMap;
 use log::info;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
-use crate::plugin::plugin_identifier::PluginIdentifier;
-use crate::utils::io::json_config::JsonConfig;
+use std::time::{Duration, Instant};
 
 const CONFIG_PATH: &str = "config.json";
 const VERSION: u32 = 3;
@@ -54,7 +54,7 @@ impl Default for HytaleServerConfig {
             log_levels: HashMap::default(),
             mods: HashMap::default(),
             display_tmp_tags_in_strings: false,
-            auth_credential_store_path: "auth.enc".to_string()
+            auth_credential_store_path: "auth.enc".to_string(),
         }
     }
 }
@@ -62,10 +62,10 @@ impl Default for HytaleServerConfig {
 pub fn load() -> HytaleServerConfig {
     info!("Loading Config...");
     let config_time = Instant::now();
-    
+
     let config = JsonConfig::load(CONFIG_PATH, true).expect("Failed to load server config");
     JsonConfig::save(CONFIG_PATH, &config, true);
-    
+
     info!("Config Loaded in {:.2?}", config_time.elapsed());
     config
 }
@@ -74,7 +74,7 @@ pub fn load() -> HytaleServerConfig {
 #[serde(rename_all = "PascalCase", default)]
 pub struct Defaults {
     pub world: String,
-    pub game_mode: GameMode
+    pub game_mode: GameMode,
 }
 
 impl Default for Defaults {
@@ -87,11 +87,10 @@ impl Default for Defaults {
 }
 
 //TODO: in com.hypixel.hytale.protocol.io.ProtocolException
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum GameMode {
     Adventure,
-    Creative
+    Creative,
 }
 
 // TODO: try DateTime<Utc> instead of Duration (could work without the convertor)
@@ -154,7 +153,7 @@ impl Default for ConnectionTimeouts {
 pub struct RateLimitConfig {
     pub enabled: bool,
     pub refill_rate: u32,
-    pub max_tokens: u32
+    pub max_tokens: u32,
 }
 
 impl RateLimitConfig {
@@ -167,7 +166,7 @@ impl Default for RateLimitConfig {
         Self {
             enabled: true,
             refill_rate: Self::DEFAULT_REFILL_RATE,
-            max_tokens: Self::DEFAULT_MAX_TOKENS
+            max_tokens: Self::DEFAULT_MAX_TOKENS,
         }
     }
 }

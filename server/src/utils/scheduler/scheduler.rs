@@ -1,15 +1,16 @@
-use std::pin::Pin;
-use std::sync::{Arc, LazyLock};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
 use ahash::{HashMap, HashMapExt};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
 pub static GLOBAL_SCHEDULER: LazyLock<Scheduler> = LazyLock::new(|| Scheduler::new());
 
 pub type JobId = u64;
-pub type AsyncTask = Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync + 'static>;
+pub type AsyncTask =
+    Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync + 'static>;
 
 #[derive(Clone)]
 pub struct Scheduler {

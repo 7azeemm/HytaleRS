@@ -1,15 +1,15 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
-use tokio::sync::RwLock;
-use tokio::time::sleep;
 use crate::command::command_manager::CommandManager;
 use crate::config;
 use crate::config::HytaleServerConfig;
 use crate::event::event_bus::EVENT_BUS;
 use crate::event::events::load_asset_event::LoadAssetEvent;
 use crate::plugin::plugin_manager::PluginManager;
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tokio::sync::RwLock;
+use tokio::time::sleep;
 
 static HYTALE_SERVER: OnceCell<HytaleServer> = OnceCell::new();
 pub static BOOTED: AtomicBool = AtomicBool::new(false);
@@ -29,15 +29,17 @@ impl HytaleServer {
     pub async fn init() {
         let config = config::load();
 
-        HYTALE_SERVER.set(Self {
-                plugin_manager: Mutex::new(PluginManager{}),
-                command_manager: Mutex::new(CommandManager{}),
+        HYTALE_SERVER
+            .set(Self {
+                plugin_manager: Mutex::new(PluginManager {}),
+                command_manager: Mutex::new(CommandManager {}),
                 config: RwLock::new(config),
-        }).unwrap();
+            })
+            .unwrap();
     }
-    
+
     pub async fn boot(&self) {
-        EVENT_BUS.dispatch(&LoadAssetEvent{}).await;
+        EVENT_BUS.dispatch(&LoadAssetEvent {}).await;
         BOOTED.store(true, Ordering::Relaxed);
     }
 

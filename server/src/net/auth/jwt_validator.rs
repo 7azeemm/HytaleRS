@@ -1,22 +1,22 @@
-use subtle::ConstantTimeEq;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use crate::net::auth::server_auth_manager::ServerAuthManager;
+use crate::net::auth::services::session_service::{SESSION_SERVICE_URL, SessionService};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use jsonwebtoken::crypto::verify;
 use jsonwebtoken::errors::ErrorKind::MissingRequiredClaim;
 use jsonwebtoken::jwk::{Jwk, JwkSet};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use log::info;
 use rustls::pki_types::CertificateDer;
-use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use subtle::ConstantTimeEq;
 use tokio::sync::{Notify, OnceCell, Semaphore};
 use uuid::Uuid;
-use crate::net::auth::server_auth_manager::ServerAuthManager;
-use crate::net::auth::services::session_service::{SessionService, SESSION_SERVICE_URL};
 
 const JWK_CACHE_EXPIRY: Duration = Duration::from_secs(3600);
 const ALGORITHM: Algorithm = Algorithm::EdDSA;
@@ -40,7 +40,11 @@ impl JWTValidator {
         }
     }
 
-    pub async fn validate_token(&self, access_token: &str, client_cert: &Vec<CertificateDer<'_>>) -> Result<Claims, String> {
+    pub async fn validate_token(
+        &self,
+        access_token: &str,
+        client_cert: &Vec<CertificateDer<'_>>,
+    ) -> Result<Claims, String> {
         validate_jwt_structure(access_token, "Identity Token")?;
 
         let claims = self.verify_signature::<Claims>(access_token).await?;
@@ -62,14 +66,16 @@ impl JWTValidator {
     async fn verify_signature<T: DeserializeOwned>(&self, token: &str) -> Result<T, String> {
         // Fetch JWKS
         let jwks = match self.get_jwks(false).await {
-            None => self.get_jwks(true).await
+            None => self
+                .get_jwks(true)
+                .await
                 .ok_or_else(|| "Failed to fetch JWKS".to_string())?,
-            Some(jwks) => jwks
+            Some(jwks) => jwks,
         };
 
         // Decode header to get kid
-        let header = decode_header(token)
-            .map_err(|e| format!("Failed to decode JWT header: {}", e))?;
+        let header =
+            decode_header(token).map_err(|e| format!("Failed to decode JWT header: {}", e))?;
 
         // Find matching key from JWKS
         let jwk = find_key(&jwks, header.kid.as_deref())
@@ -105,7 +111,11 @@ impl JWTValidator {
 
         // Wait for fetch to complete
         self.fetch_done.notified().await;
-        self.jwks.lock().unwrap().as_ref().map(|(jwks, _)| jwks.clone())
+        self.jwks
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|(jwks, _)| jwks.clone())
     }
 
     pub fn fetch_jwks(&self) {
@@ -122,19 +132,22 @@ impl JWTValidator {
 
 fn validate_jwt_structure(token: &str, token_type: &str) -> Result<(), String> {
     if token.is_empty() {
-        return Err(format!("{} is empty.", token_type))
+        return Err(format!("{} is empty.", token_type));
     }
 
     let parts: Vec<&str> = token.split(".").collect();
     if parts.len() != 3 {
-        return Err(format!("{} has invalid format.", token_type))
+        return Err(format!("{} has invalid format.", token_type));
     }
 
     let sig_len = parts[2].len();
     match sig_len {
         0 => Err(format!("{} has empty signature.", token_type)),
-        1..80 | 91.. => Err(format!("{} has invalid signature length {}.", token_type, sig_len)),
-        _ => Ok(())
+        1..80 | 91.. => Err(format!(
+            "{} has invalid signature length {}.",
+            token_type, sig_len
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -155,10 +168,7 @@ fn validate_claims(claims: &Claims) -> Result<(), String> {
     // Check expiration
     if let Some(exp) = claims.exp {
         if now >= exp + LEEWAY_SECONDS {
-            return Err(format!(
-                "Token expired (exp: {}, now: {})",
-                exp, now
-            ));
+            return Err(format!("Token expired (exp: {}, now: {})", exp, now));
         }
     } else {
         return Err("Token missing expiration claim".into());
@@ -167,10 +177,7 @@ fn validate_claims(claims: &Claims) -> Result<(), String> {
     // Check not before
     if let Some(nbf) = claims.nbf {
         if now < nbf.saturating_sub(LEEWAY_SECONDS) {
-            return Err(format!(
-                "Token not yet valid (nbf: {}, now: {})",
-                nbf, now
-            ));
+            return Err(format!("Token not yet valid (nbf: {}, now: {})", nbf, now));
         }
     }
 
@@ -196,9 +203,9 @@ fn find_key<'a>(jwks: &'a JwkSet, kid: Option<&str>) -> Option<&'a Jwk> {
     for jwk in &jwks.keys {
         // Check if this is an Ed25519 key (OctetKeyPair)
         if !matches!(
-                &jwk.algorithm,
-                jsonwebtoken::jwk::AlgorithmParameters::OctetKeyPair(_)
-            ) {
+            &jwk.algorithm,
+            jsonwebtoken::jwk::AlgorithmParameters::OctetKeyPair(_)
+        ) {
             continue;
         }
 
@@ -217,10 +224,17 @@ fn find_key<'a>(jwks: &'a JwkSet, kid: Option<&str>) -> Option<&'a Jwk> {
     None
 }
 
-fn validate_certificate_binding(claims: &Claims, client_cert: &Vec<CertificateDer<'_>>) -> Result<(), String> {
+fn validate_certificate_binding(
+    claims: &Claims,
+    client_cert: &Vec<CertificateDer<'_>>,
+) -> Result<(), String> {
     // The JWT must contain the fingerprint (cnf.x5t#S256)
-    let Some(jwt_fp) = claims.cnf.as_ref().map(|c| c.certificate_fingerprint.as_str()) else {
-        return Err("Missing certificate fingerprint".into())
+    let Some(jwt_fp) = claims
+        .cnf
+        .as_ref()
+        .map(|c| c.certificate_fingerprint.as_str())
+    else {
+        return Err("Missing certificate fingerprint".into());
     };
 
     if jwt_fp.is_empty() {
@@ -229,13 +243,12 @@ fn validate_certificate_binding(claims: &Claims, client_cert: &Vec<CertificateDe
 
     // The mTLS connection must have presented a certificate
     let Some(client_cert) = client_cert.first() else {
-        return Err("Missing client certificate".into())
+        return Err("Missing client certificate".into());
     };
 
     // Compute the fingerprint of the presented certificate
-    let actual_fp = compute_certificate_fingerprint(client_cert).ok_or_else(|| {
-        "Failed to compute client certificate fingerprint".to_string()
-    })?;
+    let actual_fp = compute_certificate_fingerprint(client_cert)
+        .ok_or_else(|| "Failed to compute client certificate fingerprint".to_string())?;
 
     // Compare in constant time
     if jwt_fp.as_bytes().ct_eq(actual_fp.as_bytes()).unwrap_u8() != 1 {
@@ -275,7 +288,7 @@ pub struct Claims {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CNF {
     #[serde(rename = "x5t#S256")]
-    pub certificate_fingerprint: String
+    pub certificate_fingerprint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

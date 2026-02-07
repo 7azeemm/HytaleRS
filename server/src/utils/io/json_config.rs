@@ -1,9 +1,9 @@
+use log::{error, info};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
-use log::{error, info};
-use serde::{Serialize};
-use serde::de::DeserializeOwned;
 
 pub struct JsonConfig;
 
@@ -14,7 +14,7 @@ impl JsonConfig {
         if !Path::new(path).exists() {
             let config = T::default();
             Self::save(path, &config, backup);
-            return Some(config)
+            return Some(config);
         }
 
         fn try_read<T: DeserializeOwned>(path: &str) -> Result<T, Error> {
@@ -32,7 +32,9 @@ impl JsonConfig {
                     error!("Trying to load config backup file {}", backup_path);
                     match try_read(&backup_path) {
                         Ok(config) => return Some(config),
-                        Err(err) => error!("Failed to load config backup file {}: {}", backup_path, err)
+                        Err(err) => {
+                            error!("Failed to load config backup file {}: {}", backup_path, err)
+                        }
                     }
                 }
             }
@@ -46,7 +48,10 @@ impl JsonConfig {
         if backup && Path::new(path).exists() {
             let backup_path = format!("{}.bak", path);
             if let Err(err) = fs::rename(path, &backup_path) {
-                error!("Failed to save config backup file from {} to {}: {}", path, backup_path, err)
+                error!(
+                    "Failed to save config backup file from {} to {}: {}",
+                    path, backup_path, err
+                )
             }
         }
 

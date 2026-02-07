@@ -1,20 +1,20 @@
+use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
+use crate::net::utils::packet_io::{decode, read_packet, write_packet};
+use crate::net::utils::rate_limiter::RateLimiter;
+use crate::net::utils::stage_timer::StageTimer;
+use log::{debug, error, info, warn};
+use parking_lot::Mutex;
+use protocol::io::packet::Packet;
+use protocol::packets::connection::{Disconnect, DisconnectCause};
+use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
+use rustls::pki_types::CertificateDer;
 use std::error::Error;
 use std::io::{Cursor, Read};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use log::{debug, error, info, warn};
-use parking_lot::Mutex;
-use quinn::{ReadError, ReadExactError, RecvStream, SendStream};
-use rustls::pki_types::CertificateDer;
 use tokio::io::AsyncReadExt;
 use tokio::time::timeout;
-use protocol::io::packet::Packet;
-use protocol::packets::connection::{Disconnect, DisconnectCause};
-use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
-use crate::net::utils::packet_io::{decode, read_packet, write_packet};
-use crate::net::utils::rate_limiter::RateLimiter;
-use crate::net::utils::stage_timer::StageTimer;
 
 pub struct Connection {
     pub id: String,
@@ -27,9 +27,11 @@ pub struct Connection {
 impl Connection {
     pub async fn run(mut self, mut recv: RecvStream) {
         self.handler.register(&mut self.context).await;
-        
+
         loop {
-            if self.context.check_timeout().await { break }
+            if self.context.check_timeout().await {
+                break;
+            }
 
             // Rate limiting
             if !self.rate_limiter.consume() {
@@ -47,8 +49,10 @@ impl Connection {
                     // Handle disconnect packet
                     if packet_id == 0x01 {
                         let reason = match decode::<Disconnect>(&body) {
-                            Some(packet) => packet.reason.unwrap_or_else(|| packet.cause.to_string()),
-                            None => "Unknown".to_owned()
+                            Some(packet) => {
+                                packet.reason.unwrap_or_else(|| packet.cause.to_string())
+                            }
+                            None => "Unknown".to_owned(),
                         };
 
                         info!("Client disconnected, reason: {}", reason);
@@ -57,17 +61,21 @@ impl Connection {
                     }
 
                     // Handle packet
-                    match self.handler.handle(packet_id, &body, &mut self.context).await {
-                        HandlerAction::Continue => {},
+                    match self
+                        .handler
+                        .handle(packet_id, &body, &mut self.context)
+                        .await
+                    {
+                        HandlerAction::Continue => {}
                         HandlerAction::Transition(new_handler) => {
                             info!("Handler changed for {}", self.address);
                             self.handler = new_handler;
                             self.handler.register(&mut self.context).await;
-                        },
+                        }
                         HandlerAction::Disconnect(reason) => {
                             self.context.disconnect(&reason).await;
                             break;
-                        },
+                        }
                         HandlerAction::Error(error) => {
                             error!("Protocol Error: {}", error);
                             self.context.disconnect("Protocol Error").await;
@@ -91,7 +99,7 @@ impl Connection {
 pub struct ConnectionContext {
     pub writer: tokio::sync::Mutex<SendStream>,
     pub timer: tokio::sync::Mutex<StageTimer>,
-    pub(crate) client_cert: Vec<CertificateDer<'static>>
+    pub(crate) client_cert: Vec<CertificateDer<'static>>,
 }
 
 impl ConnectionContext {
@@ -106,7 +114,7 @@ impl ConnectionContext {
         let mut writer = self.writer.lock().await;
         if let Err(err) = writer.write_all(&bytes).await {
             error!("Failed to write packet {}: {}", P::name(), err);
-            return
+            return;
         }
         info!("Sent Packet {}", P::name());
     }
@@ -116,8 +124,9 @@ impl ConnectionContext {
         info!("Disconnecting..., reason: {}", reason);
         self.send(Disconnect {
             cause: DisconnectCause::Disconnect,
-            reason: Some(reason.to_owned())
-        }).await;
+            reason: Some(reason.to_owned()),
+        })
+        .await;
         self.close().await;
     }
 
@@ -137,7 +146,7 @@ impl ConnectionContext {
         let timer = self.timer.lock().await;
         if timer.is_timed_out() {
             info!("Handler timeout after {:.2?}", timer.elapsed());
-            return true
+            return true;
         }
         false
     }

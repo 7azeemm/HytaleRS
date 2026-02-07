@@ -1,9 +1,9 @@
-use std::fmt::Debug;
-use std::sync::LazyLock;
 use crate::io::codecs::PacketCodec;
 use crate::io::decoder::Decoder;
 use crate::io::encoder::Encoder;
 use crate::io::errors::PacketResult;
+use std::fmt::Debug;
+use std::sync::LazyLock;
 
 inventory::collect!(PacketInfo);
 static PACKETS: LazyLock<Vec<Option<&'static PacketInfo>>> = LazyLock::new(|| {

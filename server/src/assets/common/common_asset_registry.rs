@@ -1,10 +1,11 @@
-use std::sync::{Arc, LazyLock, OnceLock};
-use ahash::{HashMap, HashMapExt};
-use parking_lot::{Mutex, RwLock};
-use protocol::packets::setup::Asset;
 use crate::assets::common::common_asset::FileCommonAsset;
+use ahash::{HashMap, HashMapExt};
+use parking_lot::RwLock;
+use protocol::packets::setup::Asset;
+use std::sync::{Arc, LazyLock, OnceLock};
 
-pub static COMMON_ASSET_REGISTRY: LazyLock<CommonAssetRegistry> = LazyLock::new(|| CommonAssetRegistry::new());
+pub static COMMON_ASSET_REGISTRY: LazyLock<CommonAssetRegistry> =
+    LazyLock::new(|| CommonAssetRegistry::new());
 
 pub struct CommonAssetRegistry {
     pub asset_by_name: RwLock<HashMap<String, Vec<Arc<FileCommonAsset>>>>,
@@ -17,7 +18,7 @@ impl CommonAssetRegistry {
         Self {
             asset_by_name: RwLock::new(HashMap::new()),
             asset_by_hash: RwLock::new(HashMap::new()),
-            cache: RwLock::new(OnceLock::new())
+            cache: RwLock::new(OnceLock::new()),
         }
     }
 

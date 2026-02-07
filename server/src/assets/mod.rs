@@ -4,7 +4,7 @@ pub mod asset_reader;
 pub mod asset_registry;
 pub mod asset_store;
 pub mod asset_type;
+pub mod common;
 pub mod errors;
 pub mod structs;
 pub mod types;
-pub mod common;

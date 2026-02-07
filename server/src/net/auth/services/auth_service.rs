@@ -1,14 +1,11 @@
-use std::error::Error;
-use std::time::Duration;
-use chrono::{DateTime, Utc};
-use log::{error, info};
-use reqwest::{Client, ClientBuilder};
-use serde::Deserialize;
-use serde_json::{value, Value};
-use tokio::sync::Mutex;
-use url::form_urlencoded;
 use crate::net::auth::credential_store::AuthTokens;
 use crate::server::VERSION;
+use chrono::Utc;
+use reqwest::{Client, ClientBuilder};
+use serde::Deserialize;
+use std::error::Error;
+use std::time::Duration;
+use url::form_urlencoded;
 
 const AUTH_SERVICE_URL: &str = "https://oauth.accounts.hytale.com/oauth2";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -24,7 +21,7 @@ impl AuthService {
             client: ClientBuilder::new()
                 .timeout(CONNECT_TIMEOUT)
                 .build()
-                .expect("Failed to build auth service")
+                .expect("Failed to build auth service"),
         }
     }
 
@@ -35,7 +32,8 @@ impl AuthService {
             .append_pair("refresh_token", refresh_token)
             .finish();
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://oauth.accounts.hytale.com/oauth2/token")
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("User-Agent", format!("HytaleServer/{}", VERSION))
@@ -47,11 +45,11 @@ impl AuthService {
         let txt = resp.text().await?;
 
         if status != reqwest::StatusCode::OK {
-            return Err(format!("HTTP Code {}: {:#?}", status, txt).into())
+            return Err(format!("HTTP Code {}: {:#?}", status, txt).into());
         }
 
         let tokens = serde_json::from_str::<TokenResponse>(&txt)?;
-        
+
         Ok(AuthTokens {
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token,
@@ -64,5 +62,5 @@ impl AuthService {
 struct TokenResponse {
     pub(crate) access_token: String,
     pub(crate) refresh_token: String,
-    pub(crate) expires_in: i32
+    pub(crate) expires_in: i32,
 }

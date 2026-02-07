@@ -1,4 +1,2 @@
 #[derive(Debug)]
-pub struct CommandManager {
-    
-}
+pub struct CommandManager {}

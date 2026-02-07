@@ -1,10 +1,10 @@
+use log::{error, info};
+use protocol::io::errors::PacketResult;
+use protocol::io::packet::{Packet, get_packet_info};
+use quinn::{ReadError, ReadExactError, RecvStream};
 use std::io::Cursor;
 use std::time::Instant;
-use log::{error, info};
-use quinn::{ReadError, ReadExactError, RecvStream};
 use tokio::io::AsyncReadExt;
-use protocol::io::errors::PacketResult;
-use protocol::io::packet::{get_packet_info, Packet};
 
 /// write framed packet to bytes
 pub fn write_packet<P: Packet>(packet: &P) -> PacketResult<Vec<u8>> {
@@ -30,7 +30,12 @@ pub fn write_packet<P: Packet>(packet: &P) -> PacketResult<Vec<u8>> {
     out.extend_from_slice(&packet_id.to_le_bytes());
     out.extend_from_slice(&payload);
 
-    info!("Encoded Packet {} in {:?}: {} bytes", P::name(), start_time.elapsed(), payload.len());
+    info!(
+        "Encoded Packet {} in {:?}: {} bytes",
+        P::name(),
+        start_time.elapsed(),
+        payload.len()
+    );
 
     Ok(out)
 }
@@ -44,15 +49,22 @@ pub async fn read_packet(recv: &mut RecvStream) -> PacketResult<(u32, Vec<u8>)> 
     };
 
     if payload_len > packet_info.max_size {
-        return Err(format!("Packet {} size {} exceeds max {}", packet_info.name(), payload_len, packet_info.max_size).into())
+        return Err(format!(
+            "Packet {} size {} exceeds max {}",
+            packet_info.name(),
+            payload_len,
+            packet_info.max_size
+        )
+        .into());
     }
 
     if payload_len == 0 {
-        return Ok((packet_id, Vec::new()))
+        return Ok((packet_id, Vec::new()));
     }
 
     let mut payload = vec![0u8; payload_len as usize];
-    recv.read_exact(&mut payload).await
+    recv.read_exact(&mut payload)
+        .await
         .map_err(|e| format!("Failed to read packet {}: {}", packet_info.name(), e))?;
 
     if packet_info.is_compressed {
@@ -74,7 +86,7 @@ pub fn decode<P: Packet>(data: &[u8]) -> Option<P> {
         Ok(p) => p,
         Err(err) => {
             error!("Failed to decode packet {}: {}", P::name(), err);
-            return None
+            return None;
         }
     };
 

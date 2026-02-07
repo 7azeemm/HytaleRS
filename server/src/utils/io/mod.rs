@@ -1,2 +1,2 @@
-pub mod json_config;
 pub mod codec;
+pub mod json_config;

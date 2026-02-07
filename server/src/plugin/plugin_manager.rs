@@ -1,4 +1,2 @@
 #[derive(Debug)]
-pub struct PluginManager {
-    
-}
+pub struct PluginManager {}

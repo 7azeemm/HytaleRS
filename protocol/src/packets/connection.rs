@@ -1,6 +1,6 @@
-use uuid::Uuid;
-use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::{FixedString, VarList, VarString};
+use macros::{packet, packet_enum, packet_field};
+use uuid::Uuid;
 
 #[packet(id = 0, max_size = 38013)]
 pub struct Connect {
@@ -19,41 +19,41 @@ pub struct Connect {
 #[packet_enum]
 pub enum ClientType {
     Game,
-    Editor
+    Editor,
 }
 
 #[packet_field]
 pub struct HostAddress {
     pub port: i16,
-    pub host: VarString<256>
+    pub host: VarString<256>,
 }
 
 #[packet(id = 1, max_size = 16384007)]
 pub struct Disconnect {
     pub cause: DisconnectCause,
-    pub reason: Option<String>
+    pub reason: Option<String>,
 }
 
 #[packet_enum]
 pub enum DisconnectCause {
     Disconnect,
-    Crash
+    Crash,
 }
 
 #[packet(id = 11, max_size = 49171)]
 pub struct AuthGrant {
     pub auth_grant: Option<VarString<4096>>,
-    pub server_identity_token: Option<VarString<8192>>
+    pub server_identity_token: Option<VarString<8192>>,
 }
 
 #[packet(id = 12, max_size = 49171)]
 pub struct AuthToken {
     pub access_token: Option<VarString<8192>>,
-    pub server_auth_grant: Option<VarString<4096>>
+    pub server_auth_grant: Option<VarString<4096>>,
 }
 
 #[packet(id = 13, max_size = 32851)]
 pub struct ServerAuthToken {
     pub access_token: Option<VarString<8192>>,
-    pub password_challenge: VarList<u8, 64>
+    pub password_challenge: VarList<u8, 64>,
 }
