@@ -46,6 +46,7 @@ impl<'a> Offsets<'a> {
 struct Scope<'a> {
     null_bits: Option<NullBits<'a>>,
     offsets: Option<Offsets<'a>>,
+    in_opt_type: bool,
 }
 
 impl<'a> Scope<'a> {
@@ -73,7 +74,11 @@ impl<'a> Scope<'a> {
             })
         };
 
-        Self { null_bits, offsets }
+        Self {
+            null_bits,
+            offsets,
+            in_opt_type: false
+        }
     }
 }
 
@@ -163,19 +168,29 @@ impl<'a> Decoder<'a> {
         self.scopes.pop().unwrap();
     }
 
-    pub fn read_null_bit(&mut self) -> bool {
-        let null_bits = self.scope().null_bits.as_mut().unwrap();
+    pub fn read_null_bit(&mut self) -> (bool, bool) {
+        let scope = self.scope();
+        scope.in_opt_type = match scope.in_opt_type {
+            true => return (true, false),
+            false => true
+        };
+
+        let null_bits = scope.null_bits.as_mut().unwrap();
         let byte_index = null_bits.index / 8;
         let bit_index = null_bits.index % 8;
 
         null_bits.index += 1;
 
         if byte_index >= null_bits.buf.len() {
-            return false;
+            return (false, true);
         }
 
         let byte = null_bits.buf[byte_index];
-        (byte & (1 << bit_index)) != 0
+        ((byte & (1 << bit_index)) != 0, true)
+    }
+
+    pub fn leave_opt_type(&mut self) {
+        self.scope().in_opt_type = false;
     }
 
     fn move_to(&mut self, new_pos: i32, field: &'static str) -> PacketResult<()> {

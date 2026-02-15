@@ -25,6 +25,7 @@ struct Offsets {
 struct Scope {
     null_bits: Option<NullBits>,
     offsets: Option<Offsets>,
+    in_opt_type: bool,
 }
 
 impl Scope {
@@ -52,7 +53,11 @@ impl Scope {
             })
         };
 
-        Self { null_bits, offsets }
+        Self {
+            null_bits,
+            offsets,
+            in_opt_type: false
+        }
     }
 }
 
@@ -91,8 +96,14 @@ impl Encoder {
         self.buf.resize(self.buf.len() + count, 0);
     }
 
-    pub fn add_null_bit(&mut self, is_present: bool) {
-        let null_bits = self.scope().null_bits.as_mut().unwrap();
+    pub fn add_null_bit(&mut self, is_present: bool) -> bool {
+        let scope = self.scope();
+        scope.in_opt_type = match scope.in_opt_type {
+            true => return false,
+            false => true
+        };
+
+        let null_bits = scope.null_bits.as_mut().unwrap();
         if is_present {
             null_bits.current_byte |= 1 << null_bits.index;
         }
@@ -105,6 +116,12 @@ impl Encoder {
             null_bits.current_byte = 0;
             null_bits.index = 0;
         }
+
+        true
+    }
+
+    pub fn leave_opt_type(&mut self) {
+        self.scope().in_opt_type = false;
     }
 
     pub fn enter_field(&mut self, layout: &PacketLayout) {

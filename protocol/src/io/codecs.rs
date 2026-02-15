@@ -382,7 +382,7 @@ impl<T: PacketCodec> PacketCodec for Vec<T> {
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
-        enc.add_null_bit(len != 0);
+        let entered_opt_type = enc.add_null_bit(len != 0);
 
         if len > 0 {
             enc.write_varint(len)?;
@@ -390,20 +390,34 @@ impl<T: PacketCodec> PacketCodec for Vec<T> {
                 item.encode(enc)?;
             }
         }
+
+        if entered_opt_type {
+            enc.leave_opt_type();
+        }
+
         Ok(())
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if !dec.read_null_bit() {
-            return Ok(Vec::new());
+        let (present, entered_opt_type) = dec.read_null_bit();
+
+        let items = match present {
+            true => {
+                let len = dec.read_varint()?;
+                let mut items = Vec::with_capacity(len);
+                for _ in 0..len {
+                    items.push(T::decode(dec)?);
+                }
+                Ok(items)
+            }
+            false => Ok(Vec::new())
+        };
+
+        if entered_opt_type {
+            dec.leave_opt_type();
         }
 
-        let len = dec.read_varint()?;
-        let mut items = Vec::with_capacity(len);
-        for _ in 0..len {
-            items.push(T::decode(dec)?);
-        }
-        Ok(items)
+        items
     }
 
     fn has_value(&self) -> bool {
@@ -420,7 +434,7 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
-        enc.add_null_bit(len != 0);
+        let entered_opt_type = enc.add_null_bit(len != 0);
 
         if len > 0 {
             if len > MAX {
@@ -435,27 +449,41 @@ impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
                 item.encode(enc)?;
             }
         }
+
+        if entered_opt_type {
+            enc.leave_opt_type();
+        }
+
         Ok(())
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if !dec.read_null_bit() {
-            return Ok(Self(Vec::new()));
+        let (present, entered_opt_type) = dec.read_null_bit();
+
+        let items = match present {
+            true => {
+                let len = dec.read_varint()?;
+                if len > MAX {
+                    return Err(PacketError::DecodeError(format!(
+                        "VarList length {} exceeds maximum of {} while decoding",
+                        len, MAX
+                    )));
+                }
+
+                let mut items = Vec::with_capacity(len);
+                for _ in 0..len {
+                    items.push(T::decode(dec)?);
+                }
+                Ok(VarList(items))
+            }
+            false => Ok(VarList(Vec::new()))
+        };
+
+        if entered_opt_type {
+            dec.leave_opt_type();
         }
 
-        let len = dec.read_varint()?;
-        if len > MAX {
-            return Err(PacketError::DecodeError(format!(
-                "VarList length {} exceeds maximum of {} while decoding",
-                len, MAX
-            )));
-        }
-
-        let mut items = Vec::with_capacity(len);
-        for _ in 0..len {
-            items.push(T::decode(dec)?);
-        }
-        Ok(Self(items))
+        items
     }
 
     fn has_value(&self) -> bool {
@@ -506,7 +534,7 @@ impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
-        enc.add_null_bit(len != 0);
+        let entered_opt_type = enc.add_null_bit(len != 0);
 
         if len > 0 {
             enc.write_varint(len)?;
@@ -515,22 +543,36 @@ impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
                 v.encode(enc)?;
             }
         }
+
+        if entered_opt_type {
+            enc.leave_opt_type();
+        }
+
         Ok(())
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if !dec.read_null_bit() {
-            return Ok(HashMap::new());
+        let (present, entered_opt_type) = dec.read_null_bit();
+
+        let items = match present {
+            true => {
+                let len = dec.read_varint()?;
+                let mut items = HashMap::with_capacity(len);
+                for _ in 0..len {
+                    let k = K::decode(dec)?;
+                    let v = V::decode(dec)?;
+                    items.insert(k, v);
+                }
+                Ok(items)
+            }
+            false => Ok(HashMap::new())
+        };
+
+        if entered_opt_type {
+            dec.leave_opt_type();
         }
 
-        let len = dec.read_varint()?;
-        let mut items = HashMap::with_capacity(len);
-        for _ in 0..len {
-            let k = K::decode(dec)?;
-            let v = V::decode(dec)?;
-            items.insert(k, v);
-        }
-        Ok(items)
+        items
     }
 
     fn has_value(&self) -> bool {
@@ -542,20 +584,33 @@ impl<T: PacketCodec> PacketCodec for Option<T> {
     const SIZE: Option<usize> = None;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
-        enc.add_null_bit(self.is_some());
+        let entered_opt_type = enc.add_null_bit(self.is_some());
 
-        match self {
+        let out = match self {
             Some(v) => v.encode(enc),
             None => Ok(()),
+        };
+
+        if entered_opt_type {
+            enc.leave_opt_type();
         }
+
+        out
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        if dec.read_null_bit() {
-            T::decode(dec).map(Some)
-        } else {
-            Ok(None)
+        let (present, entered_opt_type) = dec.read_null_bit();
+
+        let item = match present {
+            true => Some(T::decode(dec)?),
+            false => None,
+        };
+
+        if entered_opt_type {
+            dec.leave_opt_type();
         }
+
+        Ok(item)
     }
 
     fn has_value(&self) -> bool {
@@ -583,21 +638,36 @@ impl<T: PacketCodec> PacketCodec for FixedOption<T> {
     const SIZE: Option<usize> = Some(T::SIZE.expect("FixedOption<T> is not Sized"));
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
-        enc.add_null_bit(self.0.is_some());
+        let entered_opt_type = enc.add_null_bit(self.0.is_some());
 
-        match &self.0 {
+        let out = match &self.0 {
             Some(v) => v.encode(enc),
             None => Ok(enc.write_zeros(Self::SIZE.unwrap())),
+        };
+
+        if entered_opt_type {
+            enc.leave_opt_type();
         }
+
+        out
     }
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
-        Ok(FixedOption(if dec.read_null_bit() {
-            Some(T::decode(dec)?)
-        } else {
-            dec.read_zeros(T::SIZE.unwrap())?;
-            None
-        }))
+        let (present, entered_opt_type) = dec.read_null_bit();
+
+        let item = match present {
+            true => FixedOption(Some(T::decode(dec)?)),
+            false => {
+                dec.read_zeros(T::SIZE.unwrap())?;
+                FixedOption(None)
+            }
+        };
+
+        if entered_opt_type {
+            dec.leave_opt_type();
+        }
+
+        Ok(item)
     }
 }
 

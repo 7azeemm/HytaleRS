@@ -24,3 +24,19 @@ pub struct Vec3f {
     pub y: f32,
     pub z: f32
 }
+
+#[derive(Serialize, Deserialize, Default)]
+#[packet_field]
+pub struct Vec3d {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+#[packet_field]
+pub struct HitBox {
+    pub min: Vec3d,
+    pub max: Vec3d,
+}

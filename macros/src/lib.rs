@@ -253,7 +253,7 @@ pub fn packet_enum(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #[derive(Debug, Clone, Copy, num_enum::IntoPrimitive, num_enum::TryFromPrimitive,
-            strum_macros::Display, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
+            strum_macros::Display, serde::Serialize, serde::Deserialize)]
         #[repr(u8)]
         #input
 

@@ -17,11 +17,11 @@ pub struct BlockParticleSetPacket {
     pub position_offset: FixedOption<Vec3f>,
     pub rotation_offset: FixedOption<Direction>,
     pub id: Option<String>,
-    pub particle_system_ids: HashMap<BlockParticleEvent, String>
+    pub particles: HashMap<BlockParticleEvent, String>
 }
 
-#[derive(Hash, Eq, PartialEq)]
 #[packet_enum]
+#[derive(Hash, Eq, PartialEq)]
 pub enum BlockParticleEvent {
     Walk,
     Run,

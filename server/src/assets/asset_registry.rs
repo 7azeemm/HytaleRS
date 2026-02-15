@@ -7,6 +7,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
+use crate::assets::types::block_hitbox::block_hitbox::BlockHitBox;
 use crate::assets::types::block_particle::block_particle_set::BlockParticleSet;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
@@ -25,6 +26,7 @@ impl StoreRegistry {
     pub async fn register_stores(&self) {
         self.register::<BlockSet>().await;
         self.register::<BlockParticleSet>().await;
+        self.register::<BlockHitBox>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {
