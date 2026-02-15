@@ -574,3 +574,61 @@ impl<T: PacketCodec> PacketCodec for Arc<T> {
         T::decode(dec).map(Arc::new)
     }
 }
+
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct FixedOption<T>(pub Option<T>);
+
+impl<T: PacketCodec> PacketCodec for FixedOption<T> {
+    const SIZE: Option<usize> = Some(T::SIZE.expect("FixedOption<T> is not Sized"));
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        enc.add_null_bit(self.0.is_some());
+
+        match &self.0 {
+            Some(v) => v.encode(enc),
+            None => Ok(enc.write_zeros(Self::SIZE.unwrap())),
+        }
+    }
+
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        Ok(FixedOption(if dec.read_null_bit() {
+            Some(T::decode(dec)?)
+        } else {
+            dec.read_zeros(T::SIZE.unwrap())?;
+            None
+        }))
+    }
+}
+
+impl<T: PacketCodec> Deref for FixedOption<T> {
+    type Target = Option<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: PacketCodec> DerefMut for FixedOption<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T: PacketCodec> From<Option<T>> for FixedOption<T> {
+    fn from(s: Option<T>) -> Self {
+        Self(s)
+    }
+}
+
+impl<T: PacketCodec> From<FixedOption<T>> for Option<T> {
+    fn from(s: FixedOption<T>) -> Self {
+        s.0
+    }
+}
+
+impl<T: PacketCodec> Display for FixedOption<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}

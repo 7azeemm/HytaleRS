@@ -132,50 +132,46 @@ impl AssetPack {
 }
 
 pub fn sort_stores(stores: Vec<Arc<dyn StoreBase>>) -> Vec<Arc<dyn StoreBase>> {
-    let mut by_type: HashMap<TypeId, Arc<dyn StoreBase>> = HashMap::with_capacity(stores.len());
-    let mut in_degree: HashMap<TypeId, usize> = HashMap::with_capacity(stores.len());
-    let mut graph: HashMap<TypeId, Vec<TypeId>> = HashMap::with_capacity(stores.len());
+    let mut by_name: HashMap<&str, Arc<dyn StoreBase>> = HashMap::with_capacity(stores.len());
+    let mut in_degree: HashMap<&str, usize> = HashMap::with_capacity(stores.len());
+    let mut graph: HashMap<&str, Vec<&str>> = HashMap::with_capacity(stores.len());
 
     // Index stores and initialize in-degrees
     for store in &stores {
-        let ty = store.type_id();
-        by_type.insert(ty, Arc::clone(store));
-        in_degree.insert(ty, 0);
+        let name = store.name();
+        by_name.insert(name, Arc::clone(store));
+        in_degree.insert(name, 0);
     }
 
     // Build dependency graph
     for store in &stores {
-        let store_ty = store.type_id();
+        let store_name = store.name();
 
         for &dep in store.dependencies() {
-            if !by_type.contains_key(&dep) {
-                panic!(
-                    "Store `{}` depends on missing store {:?}",
-                    store.name(),
-                    dep
-                );
+            if !by_name.contains_key(dep) {
+                panic!("Store `{}` depends on missing store `{}`", store_name, dep);
             }
 
-            *in_degree.get_mut(&store_ty).unwrap() += 1;
-            graph.entry(dep).or_default().push(store_ty);
+            *in_degree.get_mut(&store_name).unwrap() += 1;
+            graph.entry(dep).or_default().push(store_name);
         }
     }
 
     // Kahn's algorithm
     let mut queue: VecDeque<_> = in_degree
         .iter()
-        .filter_map(|(&ty, &deg)| if deg == 0 { Some(ty) } else { None })
+        .filter_map(|(&name, &deg)| if deg == 0 { Some(name) } else { None })
         .collect();
 
     let mut result = Vec::with_capacity(stores.len());
 
-    while let Some(ty) = queue.pop_front() {
-        result.push(Arc::clone(&by_type[&ty]));
+    while let Some(name) = queue.pop_front() {
+        result.push(Arc::clone(&by_name[name]));
 
-        if let Some(children) = graph.get(&ty) {
+        if let Some(children) = graph.get(name) {
             for &child in children {
                 *in_degree.get_mut(&child).unwrap() -= 1;
-                if in_degree[&child] == 0 {
+                if in_degree[child] == 0 {
                     queue.push_back(child);
                 }
             }

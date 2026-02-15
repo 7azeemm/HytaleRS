@@ -18,7 +18,7 @@ use std::time::Instant;
 #[async_trait]
 pub trait StoreBase: Any + Send + Sync + 'static {
     fn name(&self) -> &'static str;
-    fn dependencies(&self) -> &'static [TypeId];
+    fn dependencies(&self) -> &'static [&'static str];
     fn as_any_arc(self: Arc<Self>) -> Arc<dyn Any + Send + Sync>;
     async fn load_assets(self: Arc<Self>, reader: &Arc<ZipReader>, pack: &str);
     async fn send_assets(&self, cx: &mut ConnectionContext);
@@ -143,7 +143,7 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
                         Either::Left((id, path, asset))
                     }
                     Err(err) => {
-                        warn!("Failed to deserialize asset {}: {}", id, err);
+                        warn!("Failed to deserialize asset {} ({}): {}", id, self.name(), err);
                         Either::Right(())
                     }
                 },
@@ -186,7 +186,7 @@ impl<T: AssetType + 'static> StoreBase for AssetStore<T> {
         T::name()
     }
 
-    fn dependencies(&self) -> &'static [TypeId] {
+    fn dependencies(&self) -> &'static [&'static str] {
         T::dependencies()
     }
 

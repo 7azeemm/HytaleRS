@@ -18,7 +18,7 @@ pub trait AssetType:
     fn parent(&self) -> Option<&str> {
         None
     }
-    fn dependencies() -> &'static [TypeId] {
+    fn dependencies() -> &'static [&'static str] {
         &[]
     }
     fn extension() -> &'static str {

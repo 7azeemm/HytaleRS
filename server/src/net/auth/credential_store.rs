@@ -5,7 +5,7 @@ use aes_gcm::aead::{Aead, KeyInit};
 use chrono::{DateTime, Utc};
 use log::{error, info};
 use pbkdf2::pbkdf2_hmac;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::error::Error;

@@ -146,6 +146,14 @@ impl<'a> Decoder<'a> {
         Ok(self.read_bytes(1)?[0])
     }
 
+    pub fn read_zeros(&mut self, count: usize) -> PacketResult<()> {
+        self.pos += count;
+        if self.pos > self.buf.len() {
+            return Err(PacketError::DecodeError("EOF while reading zero bytes".into()));
+        }
+        Ok(())
+    }
+
     pub fn enter_field(&mut self, layout: &PacketLayout) {
         let scope = Scope::new(self, self.pos, layout);
         self.scopes.push(scope);

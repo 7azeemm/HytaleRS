@@ -1,7 +1,7 @@
 use crate::assets::asset_type::{Asset, AssetType};
 use parking_lot::RawRwLock;
 use parking_lot::lock_api::RwLockReadGuard;
-use protocol::packets::assets::block_sets::UpdateBlockSets;
+use protocol::packets::assets::block_sets::{BlockSetPacket, UpdateBlockSets};
 use protocol::packets::assets::update_type::UpdateType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -50,8 +50,8 @@ impl AssetType for BlockSet {
     ) -> Self::InitPacketType {
         let mut block_sets = HashMap::new();
 
-        for (id, _) in map.iter() {
-            let packet = protocol::packets::assets::block_sets::BlockSet {
+        for id in map.keys() {
+            let packet = BlockSetPacket {
                 name: Some(id.to_owned()),
                 blocks: vec![5, 8, 10].into(),
             };

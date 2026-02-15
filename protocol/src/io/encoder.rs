@@ -87,6 +87,10 @@ impl Encoder {
         self.buf.push(byte);
     }
 
+    pub fn write_zeros(&mut self, count: usize) {
+        self.buf.resize(self.buf.len() + count, 0);
+    }
+
     pub fn add_null_bit(&mut self, is_present: bool) {
         let null_bits = self.scope().null_bits.as_mut().unwrap();
         if is_present {
