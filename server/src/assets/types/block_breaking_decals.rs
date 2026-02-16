@@ -4,27 +4,28 @@ use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::io::codecs::VarList;
 use protocol::objects::HitBox;
-use protocol::packets::assets::block_hitboxes::UpdateBlockHitBoxes;
+use protocol::packets::assets::block_breaking_decals::{BlockBreakingDecalPacket, UpdateBlockBreakingDecals};
+use protocol::packets::assets::block_hitbox::UpdateBlockHitBoxes;
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
-pub struct BlockHitBox {
+pub struct BlockBreakingDecal {
     pub id: String,
     pub parent: Option<String>,
-    pub boxes: Vec<HitBox>,
+    pub stage_textures: Vec<String>
 }
 
-impl AssetType for BlockHitBox {
-    type InitPacketType = UpdateBlockHitBoxes;
+impl AssetType for BlockBreakingDecal {
+    type InitPacketType = UpdateBlockBreakingDecals;
 
     fn name() -> &'static str {
-        "BlockHitboxes"
+        "BlockBreakingDecals"
     }
 
     fn path() -> &'static str {
-        "Item/Block/Hitboxes"
+        "Item/Block/BreakingDecals"
     }
 
     fn id(&self) -> &str {
@@ -42,16 +43,17 @@ impl AssetType for BlockHitBox {
     fn generate_init_packet(
         map: RwLockReadGuard<RawRwLock, HashMap<String, Asset<Self>>>,
     ) -> Self::InitPacketType {
-        let mut block_hitboxes: HashMap<i32, VarList<HitBox, _>> = HashMap::new();
+        let mut block_breaking_decals: HashMap<String, BlockBreakingDecalPacket> = HashMap::new();
 
-        if let Some(asset) = map.values().next() {
-            block_hitboxes.insert(0, asset.data.boxes.clone().into());
+        if let Some((id, asset)) = map.iter().next() {
+            block_breaking_decals.insert(id.to_owned(), BlockBreakingDecalPacket {
+                stage_textures: asset.data.stage_textures.clone()
+            });
         }
 
-        UpdateBlockHitBoxes {
+        UpdateBlockBreakingDecals {
             update_type: UpdateType::Init,
-            max_id: block_hitboxes.len() as i32,
-            hitboxes: block_hitboxes,
+            block_breaking_decals,
         }
     }
 }

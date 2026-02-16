@@ -40,3 +40,20 @@ pub struct HitBox {
     pub min: Vec3d,
     pub max: Vec3d,
 }
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+#[packet_field]
+pub struct FloatRange {
+    pub min: f32,
+    pub max: f32,
+}
+
+impl FloatRange {
+    pub fn new(min: f32, max: f32) -> Self {
+        Self {
+            min,
+            max,
+        }
+    }
+}

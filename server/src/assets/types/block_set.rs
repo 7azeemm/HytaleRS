@@ -1,7 +1,7 @@
 use crate::assets::asset_type::{Asset, AssetType};
 use parking_lot::RawRwLock;
 use parking_lot::lock_api::RwLockReadGuard;
-use protocol::packets::assets::block_sets::{BlockSetPacket, UpdateBlockSets};
+use protocol::packets::assets::block_set::{BlockSetPacket, UpdateBlockSets};
 use protocol::packets::assets::update_type::UpdateType;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

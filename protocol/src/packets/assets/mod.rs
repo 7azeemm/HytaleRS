@@ -1,4 +1,6 @@
-pub mod block_sets;
+pub mod block_set;
 pub mod update_type;
-pub mod block_particle_sets;
-pub mod block_hitboxes;
+pub mod block_particle_set;
+pub mod block_hitbox;
+pub mod block_sound_set;
+pub mod block_breaking_decals;

@@ -1,14 +1,16 @@
 use crate::assets::asset_store::{AssetStore, StoreBase};
 use crate::assets::asset_type::AssetType;
-use crate::assets::types::block_set::block_set::BlockSet;
 use crate::net::connection_manager::ConnectionContext;
 use log::info;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
-use crate::assets::types::block_hitbox::block_hitbox::BlockHitBox;
-use crate::assets::types::block_particle::block_particle_set::BlockParticleSet;
+use crate::assets::types::block_breaking_decals::BlockBreakingDecal;
+use crate::assets::types::block_hitbox::BlockHitBox;
+use crate::assets::types::block_particle_set::BlockParticleSet;
+use crate::assets::types::block_set::BlockSet;
+use crate::assets::types::block_sound_set::BlockSoundSet;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
 
@@ -27,6 +29,8 @@ impl StoreRegistry {
         self.register::<BlockSet>().await;
         self.register::<BlockParticleSet>().await;
         self.register::<BlockHitBox>().await;
+        self.register::<BlockSoundSet>().await;
+        self.register::<BlockBreakingDecal>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

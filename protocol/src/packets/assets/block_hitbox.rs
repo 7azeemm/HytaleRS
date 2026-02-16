@@ -8,5 +8,5 @@ use crate::packets::assets::update_type::UpdateType;
 pub struct UpdateBlockHitBoxes {
     pub update_type: UpdateType,
     pub max_id: i32,
-    pub hitboxes: HashMap<i32, VarList<HitBox, 64>>,
+    pub block_hitboxes: HashMap<i32, VarList<HitBox, 64>>,
 }
