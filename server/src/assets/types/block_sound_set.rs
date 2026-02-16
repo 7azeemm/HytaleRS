@@ -14,7 +14,7 @@ use crate::assets::asset_type::{Asset, AssetType};
 pub struct BlockSoundSet {
     pub id: String,
     pub parent: Option<String>,
-    pub sound_event_ids: HashMap<BlockSoundEvent, i32>,
+    pub sound_events: HashMap<BlockSoundEvent, String>,
     pub move_in_repeat_range: FloatRange
 }
 
@@ -23,7 +23,7 @@ impl Default for BlockSoundSet {
         Self {
             id: String::new(),
             parent: None,
-            sound_event_ids: HashMap::default(),
+            sound_events: HashMap::default(),
             move_in_repeat_range: FloatRange::new(0.5, 1.5)
         }
     }
@@ -61,7 +61,7 @@ impl AssetType for BlockSoundSet {
             block_sound_sets.insert(0, BlockSoundSetPacket {
                 move_in_repeat_range: Some(asset.data.move_in_repeat_range.clone()).into(),
                 id: Some(asset.data.id.clone()),
-                sound_event_indices: asset.data.sound_event_ids.clone()
+                sound_event_indices: HashMap::default()
             });
         }
 

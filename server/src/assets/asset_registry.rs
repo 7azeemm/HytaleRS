@@ -6,11 +6,16 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
+use crate::assets::types::audio_category::AudioCategory;
 use crate::assets::types::block_breaking_decals::BlockBreakingDecal;
 use crate::assets::types::block_hitbox::BlockHitBox;
 use crate::assets::types::block_particle_set::BlockParticleSet;
 use crate::assets::types::block_set::BlockSet;
 use crate::assets::types::block_sound_set::BlockSoundSet;
+use crate::assets::types::equalizer_effect::EqualizerEffect;
+use crate::assets::types::item_sound_set::ItemSoundSet;
+use crate::assets::types::reverb_effect::ReverbEffect;
+use crate::assets::types::sound_set::SoundSet;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
 
@@ -31,6 +36,11 @@ impl StoreRegistry {
         self.register::<BlockHitBox>().await;
         self.register::<BlockSoundSet>().await;
         self.register::<BlockBreakingDecal>().await;
+        self.register::<ItemSoundSet>().await;
+        self.register::<AudioCategory>().await;
+        self.register::<EqualizerEffect>().await;
+        self.register::<ReverbEffect>().await;
+        self.register::<SoundSet>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {
