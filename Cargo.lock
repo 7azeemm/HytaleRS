@@ -1897,7 +1897,6 @@ dependencies = [
  "macros",
  "num_enum",
  "serde",
- "serde_repr",
  "strum_macros",
  "uuid",
 ]

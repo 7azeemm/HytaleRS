@@ -4,7 +4,7 @@ use crate::assets::structs::{ParsedAsset, PendingAsset, StoreStats};
 use crate::net::connection_manager::ConnectionContext;
 use async_trait::async_trait;
 use log::{info, warn};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rayon::iter::Either;
 use rayon::prelude::{
     IntoParallelIterator, ParallelIterator,
@@ -20,7 +20,7 @@ pub trait StoreBase: Any + Send + Sync + 'static {
     fn name(&self) -> &'static str;
     fn dependencies(&self) -> &'static [&'static str];
     fn as_any_arc(self: Arc<Self>) -> Arc<dyn Any + Send + Sync>;
-    async fn load_assets(self: Arc<Self>, reader: &Arc<ZipReader>, pack: &str);
+    async fn load_assets(self: Arc<Self>, reader: &Arc<ZipReader>, pack: &str, global_stats: Arc<Mutex<StoreStats>>);
     async fn send_assets(&self, cx: &mut ConnectionContext);
 }
 
@@ -165,18 +165,8 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
             self.name(),
             start.elapsed()
         );
-        self.print_stats();
-    }
 
-    pub fn print_stats(&self) {
-        let stats = self.stats.read();
-        info!(
-            "Store {} Stats: Loaded: {}, Failed: {}, Orphans: {}",
-            self.name(),
-            stats.loaded,
-            stats.failed,
-            stats.orphans
-        );
+        self.stats.read().print(&format!("Store {}", self.name()));
     }
 }
 
@@ -194,7 +184,7 @@ impl<T: AssetType + 'static> StoreBase for AssetStore<T> {
         self
     }
 
-    async fn load_assets(self: Arc<Self>, reader: &Arc<ZipReader>, pack: &str) {
+    async fn load_assets(self: Arc<Self>, reader: &Arc<ZipReader>, pack: &str, global_stats: Arc<Mutex<StoreStats>>) {
         let store_path = format!("Server/{}", T::path());
         let paths: Vec<&String> = reader.iter(&store_path, T::extension()).collect();
 
@@ -221,7 +211,9 @@ impl<T: AssetType + 'static> StoreBase for AssetStore<T> {
             }
         }
 
-        self.decode_assets(raw_assets, &reader, pack).await;
+        //TODO: improve this
+        self.clone().decode_assets(raw_assets, &reader, pack).await;
+        global_stats.lock().add(&self.stats.read());
     }
 
     async fn send_assets(&self, cx: &mut ConnectionContext) {

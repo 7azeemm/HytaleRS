@@ -9,3 +9,4 @@ pub mod audio_category;
 pub mod equalizer_effect;
 pub mod reverb_effect;
 pub mod sound_set;
+pub mod sound_event;

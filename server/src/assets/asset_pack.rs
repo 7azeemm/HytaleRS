@@ -13,6 +13,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
+use parking_lot::Mutex;
+use crate::assets::structs::StoreStats;
 
 pub struct AssetPack {
     name: String,
@@ -55,11 +57,14 @@ impl AssetPack {
 
     pub async fn load_assets(&self) {
         let stores = sort_stores(STORE_REGISTRY.get_all_stores().await);
+        let global_stats = Arc::new(Mutex::new(StoreStats::default()));
 
         for store in stores {
             info!("Loading Assets from {}", self.name);
-            store.load_assets(&self.reader, &self.name).await;
+            store.load_assets(&self.reader, &self.name, global_stats.clone()).await;
         }
+        
+        global_stats.lock().print("All Stores");
     }
 
     pub async fn load_common_assets_index_hashes(&self) {
