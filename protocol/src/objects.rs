@@ -57,3 +57,27 @@ impl FloatRange {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+#[packet_field]
+pub struct Range {
+    pub min: i32,
+    pub max: i32,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+#[packet_field]
+pub struct RangeByte {
+    pub min: u8,
+    pub max: u8,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+#[packet_field]
+pub struct RangeFloat {
+    pub min: f32,
+    pub max: f32,
+}

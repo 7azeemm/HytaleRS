@@ -6,6 +6,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::RwLock;
+use crate::assets::types::ambience_fx::AmbienceFX;
 use crate::assets::types::audio_category::AudioCategory;
 use crate::assets::types::block_breaking_decals::BlockBreakingDecal;
 use crate::assets::types::block_hitbox::BlockHitBox;
@@ -43,6 +44,7 @@ impl StoreRegistry {
         self.register::<ReverbEffect>().await;
         self.register::<SoundSet>().await;
         self.register::<SoundEvent>().await;
+        self.register::<AmbienceFX>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {
