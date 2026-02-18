@@ -20,7 +20,7 @@ use tokio::time::timeout;
 use uuid::Uuid;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
-pub const PROTOCOL_CRC: i32 = 1789265863;
+pub const PROTOCOL_CRC: i32 = -1356075132;
 const PROTOCOLS: &[&[u8]] = &[b"hytale/2", b"hytale/1"];
 const PORT: &str = "5520";
 

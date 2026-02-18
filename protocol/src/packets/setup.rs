@@ -23,7 +23,7 @@ pub struct ServerInfo {
     pub motd: Option<String>,
 }
 
-#[packet(id = 21, max_size = 16384014)]
+#[packet(id = 21, max_size = 0x64000000)]
 pub struct WorldLoadProgress {
     pub percent_complete: i32,
     pub percent_complete_subitem: i32,
