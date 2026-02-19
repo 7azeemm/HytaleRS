@@ -9,6 +9,7 @@ pub mod errors;
 pub mod structs;
 pub mod types;
 pub mod codec;
+pub mod objects;
 /*
 # HytaleAssetStore extends AssetStore
 - Packet Generator

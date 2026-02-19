@@ -10,3 +10,4 @@ pub mod reverb_effect;
 pub mod sound_set;
 pub mod sound_event;
 pub mod ambience_fx;
+pub mod weather;

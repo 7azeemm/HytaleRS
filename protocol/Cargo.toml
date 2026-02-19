@@ -15,3 +15,4 @@ num_enum.workspace = true
 strum_macros.workspace = true
 log.workspace = true
 serde.workspace = true
+ordered-float.workspace = true

@@ -7,6 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use ordered_float::OrderedFloat;
 use uuid::Uuid;
 
 const MAX_STRING_LENGTH: usize = 4_096_000;
@@ -700,5 +701,25 @@ impl<T: PacketCodec> From<FixedOption<T>> for Option<T> {
 impl<T: PacketCodec> Display for FixedOption<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.0)
+    }
+}
+
+impl<T> Default for FixedOption<T> {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl PacketCodec for OrderedFloat<f32> {
+    const SIZE: Option<usize> = Some(4);
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        enc.write_bytes(&self.0.to_le_bytes());
+        Ok(())
+    }
+
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        let bytes = dec.read_bytes(4)?;
+        Ok(OrderedFloat(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])))
     }
 }

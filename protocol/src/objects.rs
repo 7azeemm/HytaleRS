@@ -1,9 +1,19 @@
 use serde::{Deserialize, Serialize};
 use macros::packet_field;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 #[packet_field]
 pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8
+}
+
+//FIXME: these have custom serialize/deserialize logic
+#[derive(Serialize, Deserialize, Default)]
+#[packet_field]
+pub struct ColorAlpha {
+    pub a: u8,
     pub r: u8,
     pub g: u8,
     pub b: u8

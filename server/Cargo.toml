@@ -48,3 +48,4 @@ zip.workspace = true
 bytes.workspace = true
 glam.workspace = true
 serde_repr.workspace = true
+ordered-float.workspace = true

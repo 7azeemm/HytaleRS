@@ -18,6 +18,7 @@ use crate::assets::types::item_sound_set::ItemSoundSet;
 use crate::assets::types::reverb_effect::ReverbEffect;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
+use crate::assets::types::weather::Weather;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
 
@@ -45,6 +46,7 @@ impl StoreRegistry {
         self.register::<SoundSet>().await;
         self.register::<SoundEvent>().await;
         self.register::<AmbienceFX>().await;
+        self.register::<Weather>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

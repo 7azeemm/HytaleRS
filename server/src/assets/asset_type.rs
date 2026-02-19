@@ -15,9 +15,7 @@ pub trait AssetType:
     fn path() -> &'static str;
     fn id(&self) -> &str;
     fn set_id(&mut self, id: String);
-    fn parent(&self) -> Option<&str> {
-        None
-    }
+    fn parent(&self) -> Option<&str>;
     fn dependencies() -> &'static [&'static str] {
         &[]
     }

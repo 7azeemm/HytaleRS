@@ -77,3 +77,4 @@ inventory = "0.3.21"
 glam = { version = "0.32.0", features = ["serde"] }
 serde_repr = "0.1.20"
 derive_more = { version = "2.1.1", features = ["from"] }
+ordered-float = "5.1.0"
