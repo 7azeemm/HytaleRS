@@ -5,7 +5,7 @@ use crate::net::server_network_manager::ServerNetworkManager;
 use log::info;
 use server::HytaleServer;
 use std::time::Instant;
-use utils::hytale_logger::Logger;
+use utils::logger::Logger;
 use utils::options;
 
 pub mod assets;

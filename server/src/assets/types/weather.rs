@@ -1,14 +1,16 @@
 use std::collections::HashMap;
+use log::info;
 use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
-use protocol::io::codecs::FixedOption;
-use protocol::objects::Color;
-use protocol::packets::assets::ambience_fx::{AmbienceFXPacket, UpdateAmbienceFX};
+use protocol::io::codecs::{FixedOption, PacketCodec};
+use protocol::io::encoder::Encoder;
+use protocol::io::packet::Packet;
 use protocol::packets::assets::update_type::UpdateType;
-use protocol::packets::assets::weather::{UpdateWeathers, WeatherPacket};
+use protocol::packets::assets::weather::{FogOptionsPacket, NearFogPacket, UpdateWeathers, WeatherPacket};
 use crate::assets::asset_type::{Asset, AssetType};
 use crate::assets::objects::{TimeColor, TimeColorAlpha, TimeFloat};
+use crate::net::utils::packet_io::read_packet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", default)]
@@ -30,7 +32,7 @@ pub struct Weather {
     pub sun_scales: Vec<TimeFloat>,
     pub moon_scales: Vec<TimeFloat>,
     pub sky_top_colors: Vec<TimeColorAlpha>,
-    pub sky_bottom_colors: Vec<TimeColorAlpha>,
+    pub sky_bottom_colors: Option<Vec<TimeColorAlpha>>,//FIXME: make null value empty vec in custom deserializer
     pub sky_sunset_colors: Vec<TimeColorAlpha>,
     pub fog_colors: Vec<TimeColor>,
     pub fog_height_fall_offs: Vec<TimeFloat>,
@@ -61,7 +63,7 @@ impl Default for Weather {
             sun_scales: vec![],
             moon_scales: vec![],
             sky_top_colors: vec![],
-            sky_bottom_colors: vec![],
+            sky_bottom_colors: None,
             sky_sunset_colors: vec![],
             fog_colors: vec![],
             fog_height_fall_offs: vec![],
@@ -113,7 +115,7 @@ impl Default for FogOptions {
 #[serde(rename_all = "PascalCase", default)]
 pub struct WeatherParticle {
     pub system_id: Option<String>,
-    pub color: Option<Color>,
+    pub color: Option<String>,//FIXME: `Option<Color>`
     pub scale: f32,
     pub overground_only: bool,
     pub position_offset_multiplier: f32,
@@ -145,13 +147,24 @@ impl AssetType for Weather {
     fn generate_init_packet(map: RwLockReadGuard<RawRwLock, HashMap<String, Asset<Self>>>) -> Self::InitPacketType {
         let mut weathers = HashMap::new();
 
-        for (i, (id, _)) in map.iter().enumerate() {
-            weathers.insert(i as i32, WeatherPacket {
-                fog: Default::default(),
-                fog_options: Default::default(),
+        for (i, (id, asset)) in map.iter().enumerate() {
+            let data = &asset.data;
+            let packet = WeatherPacket {
+                fog: FixedOption(NearFogPacket {
+                    near: data.fog_distance[0],//TODO: panics
+                    far: data.fog_distance[1],
+                }.into()),
+                fog_options: FixedOption(FogOptionsPacket {
+                    ignore_fog_limits: true,
+                    effective_view_distance_multiplier: 1.0,
+                    fog_far_view_distance: 1.0,
+                    fog_height_camera_offset: 4.0,
+                    fog_height_camera_overridden: true,
+                    fog_height_camera_fixed: 5.0
+                }.into()),
                 id: Some(id.clone()),
-                tag_indexes: vec![],
-                stars: None,
+                tag_indexes: vec![0, 5],
+                stars: Some(data.stars.clone()),
                 moons: Default::default(),
                 clouds: vec![],
                 sunlight_damping_multiplier: Default::default(),
@@ -168,18 +181,27 @@ impl AssetType for Weather {
                 fog_colors: Default::default(),
                 fog_height_fall_offs: Default::default(),
                 fog_densities: Default::default(),
-                screen_effect: None,
+                screen_effect: Some(data.screen_effect.clone()),
                 screen_effect_colors: Default::default(),
                 color_filters: Default::default(),
                 water_tints: Default::default(),
                 weather_particle: None,
-            });
+            };
+
+            weathers.insert(i as i32, packet);
+
+            break;
         }
 
-        UpdateWeathers {
+        let packet = UpdateWeathers {
             update_type: UpdateType::Init,
             max_id: weathers.len() as i32,
             weathers
-        }
+        };
+
+        let bytes = Packet::encode(&packet).unwrap();
+        let packet: UpdateWeathers = Packet::decode(&bytes).unwrap();
+
+        packet
     }
 }

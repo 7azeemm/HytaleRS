@@ -49,10 +49,12 @@ fn generate_layout(field_types: &[&syn::Type]) -> proc_macro2::TokenStream {
             })*;
 
             let var_field_count = 0usize #(+ if <#field_types as crate::io::codecs::PacketCodec>::SIZE.is_none() { 1 } else { 0 })*;
+            let opt_field_count = 0usize #(+ if <#field_types as crate::io::codecs::PacketCodec>::OPTIONAL { 1 } else { 0 })*;
 
             crate::io::packet::PacketLayout {
                 fixed_block_size,
                 var_field_count,
+                opt_field_count
             }
         }
     }

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use protocol::objects::{Color, ColorAlpha};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
@@ -12,12 +11,12 @@ pub struct TimeFloat {
 #[serde(rename_all = "PascalCase", default)]
 pub struct TimeColor {
     pub hour: f32,
-    pub color: Color
+    pub color: String//FIXME: `Color` with custom deserializer
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct TimeColorAlpha {
     pub hour: f32,
-    pub color: ColorAlpha
+    pub color: String//FIXME: `ColorAlpha` with custom deserializer
 }

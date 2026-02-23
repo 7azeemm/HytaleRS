@@ -43,6 +43,7 @@ impl Logger {
         let mut file = match OpenOptions::new().create(true).append(true).open(&log_path) {
             Ok(f) => f,
             Err(e) => {
+                //FIXME: happens if logs dir doesn't exist
                 eprintln!("Failed to open log file: {}", e);
                 return;
             }

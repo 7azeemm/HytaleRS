@@ -51,47 +51,46 @@ struct Scope<'a> {
 
 impl<'a> Scope<'a> {
     fn new(dec: &mut Decoder<'a>, pos: usize, layout: &PacketLayout) -> Self {
-        let null_bits_size = layout.var_field_count.div_ceil(8);
-
-        let null_bits = if null_bits_size == 0 {
-            None
-        } else {
-            dec.pos += null_bits_size;
-            Some(NullBits {
-                buf: &dec.buf[pos..pos + null_bits_size],
-                index: 0,
-            })
+        let null_bits_size = layout.opt_field_count.div_ceil(8);
+        let null_bits = match null_bits_size == 0 {
+            true => None,
+            false => {
+                dec.pos += null_bits_size;
+                Some(NullBits {
+                    buf: &dec.buf[pos..pos + null_bits_size],
+                    index: 0,
+                })
+            }
         };
 
-        let offsets = if layout.var_field_count <= 1 {
-            None
-        } else {
-            Some(Offsets {
-                buf: None,
-                pos: 0,
-                start_pos: pos + null_bits_size + layout.fixed_block_size,
-                size: layout.var_field_count * 4,
-            })
+        let offsets = match layout.var_field_count <= 1 {
+            true => None,
+            false => {
+                Some(Offsets {
+                    buf: None,
+                    pos: 0,
+                    start_pos: pos + null_bits_size + layout.fixed_block_size,
+                    size: layout.var_field_count * 4,
+                })
+            }
         };
 
         Self {
             null_bits,
             offsets,
-            in_opt_type: false
+            in_opt_type: false,
         }
     }
 }
 
 impl<'a> Decoder<'a> {
     pub fn new(buf: &'a [u8], layout: &PacketLayout) -> PacketResult<Self> {
-        let null_bits_size = layout.var_field_count.div_ceil(8);
-        let offsets_size = if layout.var_field_count > 1 {
-            layout.var_field_count * 4
-        } else {
-            0
+        let offsets_size = match layout.var_field_count > 1 {
+            true => layout.var_field_count * 4,
+            false => 0
         };
 
-        let min_size = null_bits_size + layout.fixed_block_size + offsets_size;
+        let min_size = layout.opt_field_count.div_ceil(8) + layout.fixed_block_size + offsets_size;
         if buf.len() < min_size {
             return Err(PacketError::Error(format!(
                 "Packet too small: expected at least {}, got {}",
@@ -154,7 +153,9 @@ impl<'a> Decoder<'a> {
     pub fn read_zeros(&mut self, count: usize) -> PacketResult<()> {
         self.pos += count;
         if self.pos > self.buf.len() {
-            return Err(PacketError::DecodeError("EOF while reading zero bytes".into()));
+            return Err(PacketError::DecodeError(
+                "EOF while reading zero bytes".into(),
+            ));
         }
         Ok(())
     }
@@ -172,7 +173,7 @@ impl<'a> Decoder<'a> {
         let scope = self.scope();
         scope.in_opt_type = match scope.in_opt_type {
             true => return (true, false),
-            false => true
+            false => true,
         };
 
         let null_bits = scope.null_bits.as_mut().unwrap();

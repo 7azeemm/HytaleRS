@@ -51,7 +51,6 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
         reader: &Arc<ZipReader>,
         pack: &str,
     ) {
-        info!("Decoding {} assets of store {}", pending.len(), self.name());
         let start = Instant::now();
         let initial_len = pending.len();
 
@@ -158,15 +157,7 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
             assets_lock.insert(id, Asset::new(asset, pack.to_owned(), path));
         }
 
-        info!(
-            "Decoded {}/{} assets of store {} in {:.2?}",
-            valid_assets_len,
-            initial_len,
-            self.name(),
-            start.elapsed()
-        );
-
-        self.stats.read().print(&format!("Store {}", self.name()));
+        self.stats.read().print(&format!("Store {}", self.name()), start.elapsed());
     }
 }
 

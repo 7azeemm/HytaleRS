@@ -52,6 +52,7 @@ pub fn get_packet_info(id: u32) -> Option<&'static PacketInfo> {
 pub struct PacketLayout {
     pub fixed_block_size: usize,
     pub var_field_count: usize,
+    pub opt_field_count: usize,
 }
 
 #[derive(Debug)]

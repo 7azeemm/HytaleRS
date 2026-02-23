@@ -56,15 +56,17 @@ impl AssetPack {
     }
 
     pub async fn load_assets(&self) {
+        let start = Instant::now();
+        info!("Loading Assets from {}", self.name);
+        
         let stores = sort_stores(STORE_REGISTRY.get_all_stores().await);
         let global_stats = Arc::new(Mutex::new(StoreStats::default()));
 
         for store in stores {
-            info!("Loading Assets from {}", self.name);
             store.load_assets(&self.reader, &self.name, global_stats.clone()).await;
         }
         
-        global_stats.lock().print("All Stores");
+        global_stats.lock().print("All Stores", start.elapsed());
     }
 
     pub async fn load_common_assets_index_hashes(&self) {

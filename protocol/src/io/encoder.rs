@@ -30,10 +30,9 @@ struct Scope {
 
 impl Scope {
     fn new(pos: usize, layout: &PacketLayout) -> Self {
-        let null_bits = if layout.var_field_count == 0 {
-            None
-        } else {
-            Some(NullBits {
+        let null_bits = match layout.opt_field_count == 0 {
+            true => None,
+            false => Some(NullBits {
                 buf: Vec::new(),
                 index: 0,
                 current_byte: 0,
@@ -41,16 +40,17 @@ impl Scope {
             })
         };
 
-        let offsets = if layout.var_field_count <= 1 {
-            None
-        } else {
-            let null_bits_size = layout.var_field_count.div_ceil(8);
-            let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
-            Some(Offsets {
-                buf: Vec::new(),
-                pos: offsets_pos,
-                var_pos: pos + layout.fixed_block_size,
-            })
+        let offsets = match layout.var_field_count <= 1 {
+            true => None,
+            false => {
+                let null_bits_size = layout.opt_field_count.div_ceil(8);
+                let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
+                Some(Offsets {
+                    buf: Vec::new(),
+                    pos: offsets_pos,
+                    var_pos: pos + layout.fixed_block_size,
+                })
+            }
         };
 
         Self {

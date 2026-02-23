@@ -14,6 +14,7 @@ const MAX_STRING_LENGTH: usize = 4_096_000;
 
 pub trait PacketCodec: Sized + Debug {
     const SIZE: Option<usize>;
+    const OPTIONAL: bool = false;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()>;
     fn decode(dec: &mut Decoder) -> PacketResult<Self>;
@@ -380,6 +381,7 @@ impl<const N: usize> Display for FixedString<N> {
 
 impl<T: PacketCodec> PacketCodec for Vec<T> {
     const SIZE: Option<usize> = None;
+    const OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
@@ -432,6 +434,7 @@ pub struct VarList<T, const MAX: usize>(pub Vec<T>);
 
 impl<T: PacketCodec, const MAX: usize> PacketCodec for VarList<T, MAX> {
     const SIZE: Option<usize> = None;
+    const OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.0.len();
@@ -532,6 +535,7 @@ impl<T: Debug, const MAX: usize> Display for VarList<T, MAX> {
 
 impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
     const SIZE: Option<usize> = None;
+    const OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let len = self.len();
@@ -583,6 +587,7 @@ impl<K: PacketCodec + Eq + Hash, V: PacketCodec> PacketCodec for HashMap<K, V> {
 
 impl<T: PacketCodec> PacketCodec for Option<T> {
     const SIZE: Option<usize> = None;
+    const OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let entered_opt_type = enc.add_null_bit(self.is_some());
@@ -637,6 +642,7 @@ pub struct FixedOption<T>(pub Option<T>);
 
 impl<T: PacketCodec> PacketCodec for FixedOption<T> {
     const SIZE: Option<usize> = Some(T::SIZE.expect("FixedOption<T> is not Sized"));
+    const OPTIONAL: bool = true;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         let entered_opt_type = enc.add_null_bit(self.0.is_some());

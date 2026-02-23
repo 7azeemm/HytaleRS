@@ -1,3 +1,4 @@
+use std::time::Duration;
 use log::info;
 use serde_json::Value;
 
@@ -9,10 +10,11 @@ pub struct StoreStats {
 }
 
 impl StoreStats {
-    pub fn print(&self, name: &str) {
+    pub fn print(&self, name: &str, elapsed_time: Duration) {
         info!(
-            "{} Stats: Loaded: {}, Failed: {}, Orphans: {}",
+            "{} Stats ({:.2?}): Loaded: {}, Failed: {}, Orphans: {}",
             name,
+            elapsed_time,
             self.loaded,
             self.failed,
             self.orphans
