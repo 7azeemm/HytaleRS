@@ -3,7 +3,7 @@ use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::io::codecs::FixedOption;
-use protocol::objects::{Range, RangeByte, RangeFloat};
+use protocol::objects::objects::{Range, RangeByte, RangeFloat};
 use protocol::packets::assets::ambience_fx::{AmbienceFXAltitude, AmbienceFXPacket, AmbienceFXSoundPlay3D, AmbienceTransitionSpeed, UpdateAmbienceFX};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};

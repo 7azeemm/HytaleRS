@@ -12,3 +12,8 @@ pub mod sound_set;
 pub mod sound_event;
 pub mod ambience_fx;
 pub mod weather;
+pub mod fluid;
+pub mod shader_type;
+pub mod model_particle;
+pub mod interaction_type;
+pub mod block_textures;

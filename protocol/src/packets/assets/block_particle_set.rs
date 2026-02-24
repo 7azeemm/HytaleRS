@@ -1,5 +1,5 @@
 use crate::io::codecs::FixedOption;
-use crate::objects::{Color, Direction, Vec3f};
+use crate::objects::objects::{Color, Direction, Vec3f};
 use macros::{packet, packet_enum, packet_field};
 use std::collections::HashMap;
 use crate::packets::assets::update_type::UpdateType;

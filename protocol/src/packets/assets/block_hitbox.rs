@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use macros::packet;
 use crate::io::codecs::VarList;
-use crate::objects::HitBox;
+use crate::objects::objects::HitBox;
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 41, max_size = 0x64000000, compressed)]

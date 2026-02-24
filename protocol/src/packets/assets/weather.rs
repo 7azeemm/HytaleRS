@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use ordered_float::OrderedFloat;
 use macros::{packet, packet_field};
 use crate::io::codecs::FixedOption;
-use crate::objects::{Color, ColorAlpha};
+use crate::objects::objects::{Color, ColorAlpha};
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 47, max_size = 0x64000000, compressed)]

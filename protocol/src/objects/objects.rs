@@ -1,22 +1,31 @@
 use serde::{Deserialize, Serialize};
-use macros::packet_field;
+use macros::{packet_enum, packet_field};
 
 #[derive(Serialize, Deserialize, Default)]
 #[packet_field]
 pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8
 }
 
 //FIXME: these have custom serialize/deserialize logic
 #[derive(Serialize, Deserialize, Default)]
 #[packet_field]
 pub struct ColorAlpha {
-    pub a: u8,
-    pub r: u8,
-    pub g: u8,
-    pub b: u8
+    pub alpha: u8,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[packet_field]
+pub struct ColorLight {
+    pub radius: u8,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8
 }
 
 #[derive(Serialize, Deserialize)]
@@ -61,10 +70,7 @@ pub struct FloatRange {
 
 impl FloatRange {
     pub fn new(min: f32, max: f32) -> Self {
-        Self {
-            min,
-            max,
-        }
+        Self { min, max }
     }
 }
 
@@ -90,4 +96,12 @@ pub struct RangeByte {
 pub struct RangeFloat {
     pub min: f32,
     pub max: f32,
+}
+
+#[packet_enum]
+pub enum Opacity {
+    Solid,
+    SemiTransparent,
+    Cutout,
+    Transparent
 }

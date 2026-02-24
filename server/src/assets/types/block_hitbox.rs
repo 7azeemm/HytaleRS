@@ -3,7 +3,7 @@ use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::io::codecs::VarList;
-use protocol::objects::HitBox;
+use protocol::objects::objects::HitBox;
 use protocol::packets::assets::block_hitbox::UpdateBlockHitBoxes;
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};

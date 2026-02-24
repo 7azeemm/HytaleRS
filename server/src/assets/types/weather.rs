@@ -1,16 +1,13 @@
 use std::collections::HashMap;
-use log::info;
 use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::io::codecs::{FixedOption, PacketCodec};
-use protocol::io::encoder::Encoder;
 use protocol::io::packet::Packet;
 use protocol::packets::assets::update_type::UpdateType;
 use protocol::packets::assets::weather::{FogOptionsPacket, NearFogPacket, UpdateWeathers, WeatherPacket};
 use crate::assets::asset_type::{Asset, AssetType};
 use crate::assets::objects::{TimeColor, TimeColorAlpha, TimeFloat};
-use crate::net::utils::packet_io::read_packet;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase", default)]

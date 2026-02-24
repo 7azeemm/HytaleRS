@@ -636,6 +636,7 @@ impl<T: PacketCodec> PacketCodec for Arc<T> {
     }
 }
 
+//TODO: improve
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct FixedOption<T>(pub Option<T>);

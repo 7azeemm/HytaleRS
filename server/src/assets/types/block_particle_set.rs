@@ -3,7 +3,7 @@ use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use serde::de::{MapAccess, Visitor};
-use protocol::objects::{Color, Direction, Vec3f};
+use protocol::objects::objects::{Color, Direction, Vec3f};
 use protocol::packets::assets::block_particle_set::{BlockParticleEvent, BlockParticleSetPacket, UpdateBlockParticleSets};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};

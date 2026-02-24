@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
-use crate::objects::{Range, RangeByte, RangeFloat};
+use crate::objects::objects::{Range, RangeByte, RangeFloat};
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 62, max_size = 0x64000000, compressed)]
