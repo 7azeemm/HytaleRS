@@ -14,3 +14,4 @@ pub mod weather;
 pub mod fluid;
 pub mod block_textures;
 pub mod model_particle;
+pub mod fluid_fx;

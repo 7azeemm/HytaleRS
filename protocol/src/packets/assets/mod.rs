@@ -17,3 +17,4 @@ pub mod shader_type;
 pub mod model_particle;
 pub mod interaction_type;
 pub mod block_textures;
+pub mod fluid_fx;
