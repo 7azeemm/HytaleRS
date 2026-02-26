@@ -40,7 +40,7 @@ pub enum FluidFog {
 
 #[packet_field]
 pub struct FluidParticlePacket {
-    pub color: FixedOption<String>,//Color
+    pub color: FixedOption<Color>,
     pub scale: f32,
     pub system_id: Option<String>
 }

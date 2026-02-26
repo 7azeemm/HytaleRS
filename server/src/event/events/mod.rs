@@ -1,1 +1,0 @@
-pub mod load_asset_event;

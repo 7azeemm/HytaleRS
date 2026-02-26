@@ -1,3 +1,12 @@
+pub mod assets;
+pub mod command;
+pub mod config;
+pub mod event;
+pub mod net;
+pub mod plugin;
+pub mod server;
+pub mod utils;
+
 use crate::assets::asset_module::ASSET_MODULE;
 use crate::assets::asset_registry::STORE_REGISTRY;
 use crate::assets::common::common_module::COMMON_ASSET_MODULE;
@@ -7,15 +16,6 @@ use server::HytaleServer;
 use std::time::Instant;
 use utils::logger::Logger;
 use utils::options;
-
-pub mod assets;
-pub mod command;
-pub mod config;
-pub mod event;
-pub mod net;
-pub mod plugin;
-pub mod server;
-pub mod utils;
 
 #[tokio::main]
 async fn main() {
