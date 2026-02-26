@@ -189,7 +189,9 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
             };
 
             fn encode(&self, enc: &mut crate::io::encoder::Encoder) -> crate::io::errors::PacketResult<()> {
-                if Self::LAYOUT.var_field_count > 0 {
+                let needs_scope = Self::LAYOUT.opt_field_count > 0 || Self::LAYOUT.var_field_count > 0;
+
+                if needs_scope {
                     enc.enter_field(&Self::LAYOUT);
                 }
 
@@ -197,7 +199,7 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
                     enc.write(&self.#field_names)?;
                 )*
 
-                if Self::LAYOUT.var_field_count > 0 {
+                if needs_scope {
                     enc.leave_field();
                 }
 
@@ -205,7 +207,9 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn decode(dec: &mut crate::io::decoder::Decoder) -> crate::io::errors::PacketResult<Self> {
-                if Self::LAYOUT.var_field_count > 0 {
+                let needs_scope = Self::LAYOUT.opt_field_count > 0 || Self::LAYOUT.var_field_count > 0;
+
+                if needs_scope {
                     dec.enter_field(&Self::LAYOUT);
                 }
 
@@ -213,7 +217,7 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
                     let #field_names: #field_types = dec.read(stringify!(#field_names))?;
                 )*
 
-                if Self::LAYOUT.var_field_count > 0 {
+                if needs_scope {
                     dec.leave_field();
                 }
 

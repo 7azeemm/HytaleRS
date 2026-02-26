@@ -18,3 +18,5 @@ pub mod model_particle;
 pub mod interaction_type;
 pub mod block_textures;
 pub mod fluid_fx;
+pub mod particle_spawner;
+pub mod fx_render_mode;

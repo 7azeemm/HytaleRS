@@ -8,6 +8,7 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use ordered_float::OrderedFloat;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 const MAX_STRING_LENGTH: usize = 4_096_000;
@@ -636,8 +637,8 @@ impl<T: PacketCodec> PacketCodec for Arc<T> {
     }
 }
 
-//TODO: improve
-#[derive(Debug, Clone)]
+//TODO: improve (FixedOption::Some())
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct FixedOption<T>(pub Option<T>);
 

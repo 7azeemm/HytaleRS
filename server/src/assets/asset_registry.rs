@@ -17,6 +17,7 @@ use crate::assets::types::equalizer_effect::EqualizerEffect;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
 use crate::assets::types::item_sound_set::ItemSoundSet;
+use crate::assets::types::particle_spawner::ParticleSpawner;
 use crate::assets::types::reverb_effect::ReverbEffect;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
@@ -51,6 +52,7 @@ impl StoreRegistry {
         self.register::<Weather>().await;
         self.register::<Fluid>().await;
         self.register::<FluidFX>().await;
+        self.register::<ParticleSpawner>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

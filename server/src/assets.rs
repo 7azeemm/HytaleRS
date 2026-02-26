@@ -9,6 +9,9 @@ pub mod errors;
 pub mod structs;
 pub mod types;
 pub mod objects;
+
+//TODO: a way to scan files and look for enums and structs with similar name (specially for packets)
+
 /*
 # HytaleAssetStore extends AssetStore
 - Packet Generator
