@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::assets::asset_registry::STORE_REGISTRY;
 use crate::assets::common::common_asset_registry::COMMON_ASSET_REGISTRY;
 use crate::config::WORLD_HEIGHT;
@@ -12,6 +13,8 @@ use protocol::packets::setup::{
     Asset, RequestAssets, ServerInfo, WorldLoadFinished, WorldLoadProgress, WorldSettings,
 };
 use std::sync::Arc;
+use protocol::packets::assets::translations::UpdateTranslations;
+use protocol::packets::assets::update_type::UpdateType;
 
 pub struct SetupHandler {
     pub player_auth: PlayerAuthentication,
@@ -69,12 +72,19 @@ impl SetupHandler {
 
         STORE_REGISTRY.send_assets(cx).await;
 
+        let mut translations = HashMap::new();
+        translations.insert("dictionary".to_owned(), "hello".to_owned());
+
+        cx.send(UpdateTranslations {
+            update_type: UpdateType::Init,
+            translations,
+        }).await;
+
         cx.send(WorldLoadProgress {
             status: "Loading World".to_owned(),
             percent_complete: 0,
             percent_complete_subitem: 0,
-        })
-        .await;
+        }).await;
         cx.send(WorldLoadFinished {}).await;
 
         HandlerAction::Continue

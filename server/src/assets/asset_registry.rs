@@ -13,11 +13,17 @@ use crate::assets::types::block_hitbox::BlockHitBox;
 use crate::assets::types::block_particle_set::BlockParticleSet;
 use crate::assets::types::block_set::BlockSet;
 use crate::assets::types::block_sound_set::BlockSoundSet;
+use crate::assets::types::entity_stat_type::EntityStatType;
+use crate::assets::types::entity_ui_component::EntityUIComponent;
 use crate::assets::types::equalizer_effect::EqualizerEffect;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
+use crate::assets::types::hitbox_collision::HitboxCollisionConfig;
+use crate::assets::types::item_reticle::ItemReticles;
 use crate::assets::types::item_sound_set::ItemSoundSet;
+use crate::assets::types::model_vfx::ModelVFX;
 use crate::assets::types::particle_spawner::ParticleSpawner;
+use crate::assets::types::repulsion::RepulsionConfig;
 use crate::assets::types::reverb_effect::ReverbEffect;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
@@ -53,6 +59,12 @@ impl StoreRegistry {
         self.register::<Fluid>().await;
         self.register::<FluidFX>().await;
         self.register::<ParticleSpawner>().await;
+        self.register::<ModelVFX>().await;
+        self.register::<RepulsionConfig>().await;
+        self.register::<HitboxCollisionConfig>().await;
+        self.register::<EntityUIComponent>().await;
+        self.register::<EntityStatType>().await;
+        self.register::<ItemReticles>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

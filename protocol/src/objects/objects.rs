@@ -50,6 +50,14 @@ pub struct Vec3f {
     pub z: f32
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+#[packet_field]
+pub struct Vec2f {
+    pub x: f32,
+    pub y: f32,
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
 #[packet_field]
