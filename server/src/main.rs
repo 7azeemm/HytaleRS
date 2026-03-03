@@ -24,7 +24,6 @@ async fn main() {
     Logger::init();
 
     info!("Booting HytaleRS Server...");
-    info!("Booting HytaleRS Server...");
     HytaleServer::init().await;
     ServerNetworkManager::init().await;
 

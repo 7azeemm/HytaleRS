@@ -16,6 +16,7 @@ use crate::assets::types::block_sound_set::BlockSoundSet;
 use crate::assets::types::entity_stat_type::EntityStatType;
 use crate::assets::types::entity_ui_component::EntityUIComponent;
 use crate::assets::types::equalizer_effect::EqualizerEffect;
+use crate::assets::types::fieldcraft_categories::FieldcraftCategories;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
 use crate::assets::types::hitbox_collision::HitboxCollisionConfig;
@@ -23,10 +24,13 @@ use crate::assets::types::item_reticle::ItemReticles;
 use crate::assets::types::item_sound_set::ItemSoundSet;
 use crate::assets::types::model_vfx::ModelVFX;
 use crate::assets::types::particle_spawner::ParticleSpawner;
+use crate::assets::types::particle_system::ParticleSystems;
 use crate::assets::types::repulsion::RepulsionConfig;
+use crate::assets::types::resource_type::ResourceTypes;
 use crate::assets::types::reverb_effect::ReverbEffect;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
+use crate::assets::types::tag_pattern::TagPattern;
 use crate::assets::types::weather::Weather;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
@@ -65,6 +69,10 @@ impl StoreRegistry {
         self.register::<EntityUIComponent>().await;
         self.register::<EntityStatType>().await;
         self.register::<ItemReticles>().await;
+        self.register::<ParticleSystems>().await;
+        self.register::<ResourceTypes>().await;
+        self.register::<FieldcraftCategories>().await;
+        self.register::<TagPattern>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

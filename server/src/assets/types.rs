@@ -22,3 +22,7 @@ pub mod hitbox_collision;
 pub mod entity_ui_component;
 pub mod entity_stat_type;
 pub mod item_reticle;
+pub mod particle_system;
+pub mod resource_type;
+pub mod fieldcraft_categories;
+pub mod tag_pattern;

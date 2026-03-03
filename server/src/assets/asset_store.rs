@@ -142,7 +142,7 @@ impl<T: AssetType + 'static + std::fmt::Debug> AssetStore<T> {
                         Either::Left((id, path, asset))
                     }
                     Err(err) => {
-                        warn!("Failed to deserialize asset {} ({}): {}", id, self.name(), err);
+                        // warn!("Failed to deserialize asset {} ({}): {}", id, self.name(), err);
                         Either::Right(())
                     }
                 },

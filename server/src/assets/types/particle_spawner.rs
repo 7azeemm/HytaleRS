@@ -198,7 +198,7 @@ impl AssetType for ParticleSpawner {
     type InitPacketType = UpdateParticleSpawners;
 
     fn name() -> &'static str {
-        "Particles"
+        "ParticleSpawners"
     }
 
     fn path() -> &'static str {

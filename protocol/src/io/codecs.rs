@@ -627,6 +627,7 @@ impl<T: PacketCodec> PacketCodec for Option<T> {
 
 impl<T: PacketCodec> PacketCodec for Arc<T> {
     const SIZE: Option<usize> = T::SIZE;
+    const OPTIONAL: bool = T::OPTIONAL;
 
     fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
         (**self).encode(enc)
@@ -634,6 +635,10 @@ impl<T: PacketCodec> PacketCodec for Arc<T> {
 
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         T::decode(dec).map(Arc::new)
+    }
+
+    fn has_value(&self) -> bool {
+        (**self).has_value()
     }
 }
 
@@ -729,5 +734,22 @@ impl PacketCodec for OrderedFloat<f32> {
     fn decode(dec: &mut Decoder) -> PacketResult<Self> {
         let bytes = dec.read_bytes(4)?;
         Ok(OrderedFloat(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])))
+    }
+}
+
+impl<T: PacketCodec> PacketCodec for Box<T> {
+    const SIZE: Option<usize> = T::SIZE;
+    const OPTIONAL: bool = T::OPTIONAL;
+
+    fn encode(&self, enc: &mut Encoder) -> PacketResult<()> {
+        (**self).encode(enc)
+    }
+
+    fn decode(dec: &mut Decoder) -> PacketResult<Self> {
+        T::decode(dec).map(Box::new)
+    }
+
+    fn has_value(&self) -> bool {
+        (**self).has_value()
     }
 }
