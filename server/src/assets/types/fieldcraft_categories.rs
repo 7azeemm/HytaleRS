@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
-use protocol::packets::assets::fieldcraft_categories::{ItemCategoryPacket, ItemGridInfoDisplayMode, UpdateFieldcraftCategories};
+use protocol::packets::assets::fieldcraft_categories::{UpdateFieldcraftCategories};
+use protocol::packets::assets::item_category::{ItemCategoryPacket, ItemGridInfoDisplayMode};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
 

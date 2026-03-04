@@ -20,6 +20,9 @@ use crate::assets::types::fieldcraft_categories::FieldcraftCategories;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
 use crate::assets::types::hitbox_collision::HitboxCollisionConfig;
+use crate::assets::types::item_animations::ItemAnimations;
+use crate::assets::types::item_category::ItemCategory;
+use crate::assets::types::item_quality::ItemQuality;
 use crate::assets::types::item_reticle::ItemReticles;
 use crate::assets::types::item_sound_set::ItemSoundSet;
 use crate::assets::types::model_vfx::ModelVFX;
@@ -77,6 +80,9 @@ impl StoreRegistry {
         self.register::<TagPattern>().await;
         self.register::<CraftingRecipes>().await;
         self.register::<Trail>().await;
+        self.register::<ItemCategory>().await;
+        self.register::<ItemQuality>().await;
+        self.register::<ItemAnimations>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

@@ -33,3 +33,6 @@ pub mod fieldcraft_categories;
 pub mod tag_pattern;
 pub mod recipes;
 pub mod trail;
+pub mod item_category;
+pub mod item_quality;
+pub mod item_animations;
