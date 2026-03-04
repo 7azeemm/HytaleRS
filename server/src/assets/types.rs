@@ -26,3 +26,5 @@ pub mod particle_system;
 pub mod resource_type;
 pub mod fieldcraft_categories;
 pub mod tag_pattern;
+pub mod recipes;
+pub mod trail;

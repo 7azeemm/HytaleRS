@@ -64,6 +64,7 @@ impl AssetType for EntityUIComponent {
                     end_opacity: 0.0,
                 }],
             });
+            break;
         }
 
         UpdateEntityUIComponents {

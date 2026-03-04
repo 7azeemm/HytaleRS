@@ -25,12 +25,14 @@ use crate::assets::types::item_sound_set::ItemSoundSet;
 use crate::assets::types::model_vfx::ModelVFX;
 use crate::assets::types::particle_spawner::ParticleSpawner;
 use crate::assets::types::particle_system::ParticleSystems;
+use crate::assets::types::recipes::CraftingRecipes;
 use crate::assets::types::repulsion::RepulsionConfig;
 use crate::assets::types::resource_type::ResourceTypes;
 use crate::assets::types::reverb_effect::ReverbEffect;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
 use crate::assets::types::tag_pattern::TagPattern;
+use crate::assets::types::trail::Trail;
 use crate::assets::types::weather::Weather;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
@@ -73,6 +75,8 @@ impl StoreRegistry {
         self.register::<ResourceTypes>().await;
         self.register::<FieldcraftCategories>().await;
         self.register::<TagPattern>().await;
+        self.register::<CraftingRecipes>().await;
+        self.register::<Trail>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {
