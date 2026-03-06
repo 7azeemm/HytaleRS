@@ -13,13 +13,17 @@ use crate::assets::types::block_hitbox::BlockHitBox;
 use crate::assets::types::block_particle_set::BlockParticleSet;
 use crate::assets::types::block_set::BlockSet;
 use crate::assets::types::block_sound_set::BlockSoundSet;
+use crate::assets::types::block_type::BlockType;
+use crate::assets::types::entity_effect::EntityEffect;
 use crate::assets::types::entity_stat_type::EntityStatType;
 use crate::assets::types::entity_ui_component::EntityUIComponent;
+use crate::assets::types::environment::Environment;
 use crate::assets::types::equalizer_effect::EqualizerEffect;
 use crate::assets::types::fieldcraft_categories::FieldcraftCategories;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
 use crate::assets::types::hitbox_collision::HitboxCollisionConfig;
+use crate::assets::types::item::Item;
 use crate::assets::types::item_animations::ItemAnimations;
 use crate::assets::types::item_category::ItemCategory;
 use crate::assets::types::item_quality::ItemQuality;
@@ -32,10 +36,12 @@ use crate::assets::types::recipes::CraftingRecipes;
 use crate::assets::types::repulsion::RepulsionConfig;
 use crate::assets::types::resource_type::ResourceTypes;
 use crate::assets::types::reverb_effect::ReverbEffect;
+use crate::assets::types::root_interactions::RootInteraction;
 use crate::assets::types::sound_event::SoundEvent;
 use crate::assets::types::sound_set::SoundSet;
 use crate::assets::types::tag_pattern::TagPattern;
 use crate::assets::types::trail::Trail;
+use crate::assets::types::unarmed_interaction::UnarmedInteraction;
 use crate::assets::types::weather::Weather;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
@@ -83,6 +89,12 @@ impl StoreRegistry {
         self.register::<ItemCategory>().await;
         self.register::<ItemQuality>().await;
         self.register::<ItemAnimations>().await;
+        self.register::<EntityEffect>().await;
+        self.register::<Environment>().await;
+        self.register::<UnarmedInteraction>().await;
+        self.register::<RootInteraction>().await;
+        self.register::<BlockType>().await;
+        self.register::<Item>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

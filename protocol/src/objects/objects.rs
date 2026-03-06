@@ -78,6 +78,15 @@ pub struct Vec3d {
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
 #[packet_field]
+pub struct Vec3i {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase")]
+#[packet_field]
 pub struct HitBox {
     pub min: Vec3d,
     pub max: Vec3d,
