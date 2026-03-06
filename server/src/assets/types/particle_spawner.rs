@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use log::info;
 use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
@@ -154,7 +155,7 @@ pub struct ParticleAttractor {
 pub struct ParticleCollision {
     pub block_type: ParticleCollisionBlockType,
     pub action: ParticleCollisionAction,
-    pub particle_rotation_influence: Option<ParticleRotationInfluence>,
+    pub particle_rotation_influence: ParticleRotationInfluence,
 }
 
 impl Default for ParticleCollision {
@@ -162,7 +163,7 @@ impl Default for ParticleCollision {
         Self {
             block_type: ParticleCollisionBlockType::None,
             action: ParticleCollisionAction::Expire,
-            particle_rotation_influence: None,
+            particle_rotation_influence: ParticleRotationInfluence::None,
         }
     }
 }
@@ -226,6 +227,24 @@ impl AssetType for ParticleSpawner {
 
         for (id, asset) in map.iter() {
             let d = &asset.data;
+            let attractors: Vec<ParticleAttractorPacket> = d.attractors.iter()
+                .map(|a| {
+                    ParticleAttractorPacket {
+                        position: a.position.clone().into(),
+                        radial_axis: a.radial_axis.clone().into(),
+                        trail_position_multiplier: a.trail_position_multiplier,
+                        radius: a.radius,
+                        radial_acceleration: a.radial_acceleration,
+                        radial_tangent_acceleration: a.radial_tangent_acceleration,
+                        linear_acceleration: a.linear_acceleration.clone().into(),
+                        radial_impulse: a.radial_impulse,
+                        radial_tangent_impulse: a.radial_tangent_impulse,
+                        linear_impulse: a.linear_impulse.clone().into(),
+                        damping_multiplier: a.damping_multiplier.clone().into(),
+                    }
+                })
+                .collect();
+
             particle_spawners.insert(id.clone(), ParticleSpawnerPacket {
                 shape: d.shape,
                 emit_offset: FixedOption(d.emit_offset.clone().into()),
@@ -244,17 +263,43 @@ impl AssetType for ParticleSpawner {
                 is_low_res: d.is_low_res,
                 trail_spawner_position_multiplier: d.trail_spawner_position_multiplier,
                 trait_spawner_rotation_multiplier: d.trait_spawner_rotation_multiplier,
-                particle_collision: FixedOption(ParticleCollisionPacket {
-                    block_type: ParticleCollisionBlockType::None,
-                    action: ParticleCollisionAction::Expire,
-                    particle_rotation_influence: ParticleRotationInfluence::None,
-                }.into()),
-                render_mode: FXRenderMode::BlendLinear,
-                light_influence: 0.0,
-                linear_filtering: false,
-                particle_life_span: FixedOption(RangeFloat::default().into()),
-                intersection_highlight: FixedOption(IntersectionHighlight::default().into()),
-                id: None, //Somehow when it is set, the client fails to deserialize the packet
+                particle_collision: FixedOption(d.particle_collision.clone().map(|p| {
+                    ParticleCollisionPacket {
+                        block_type: p.block_type,
+                        action: p.action,
+                        particle_rotation_influence: p.particle_rotation_influence,
+                    }
+                })),
+                render_mode: d.render_mode,
+                light_influence: d.light_influence,
+                linear_filtering: d.linear_filtering,
+                particle_life_span: FixedOption(d.particle_life_span.clone()),
+                intersection_highlight: FixedOption(d.intersection_highlight.clone().into()),
+                id: None,
+                // particle: d.particle.clone().map(|p| {
+                //     ParticlePacket {
+                //         frame_size: p.frame_size.into(),
+                //         uv_option: p.uv_option,
+                //         scale_ratio_constraint: p.scale_ratio_constraint,
+                //         soft_particles: p.soft_particles,
+                //         soft_particles_fade_factor: p.soft_particles_fade_factor,
+                //         use_sprite_blending: p.use_sprite_blending,
+                //         initial_animation_frame: Default::default(),
+                //         collision_animation_frame: Default::default(),
+                //         texture_path: p.texture_path.clone(),
+                //         animation_frames: Default::default(),
+                //     }
+                // }),
+                // uv_motion: Some(UVMotionPacket {
+                //     add_random_uv_offset: d.uv_motion.add_random_uv_offset,
+                //     speed_x: d.uv_motion.speed_x,
+                //     speed_y: d.uv_motion.speed_y,
+                //     scale: d.uv_motion.scale,
+                //     strength: d.uv_motion.strength,
+                //     strength_curve_type: d.uv_motion.strength_curve_type,
+                //     texture: d.uv_motion.texture.clone(),
+                // }),
+                // attractors,
                 particle: None,
                 uv_motion: None,
                 attractors: vec![],

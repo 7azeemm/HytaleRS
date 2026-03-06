@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use macros::{packet, packet_enum, packet_field};
-use crate::packets::assets::interaction_type::InteractionType;
+use macros::{packet, packet_field};
+use crate::packets::assets::interactions::interaction::{GameMode, InteractionRules};
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 67, max_size = 0x64000000, compressed)]
@@ -36,23 +36,4 @@ pub struct InteractionCooldown {
 pub struct RootInteractionSettings {
     pub allow_skip_chain_on_click: bool,
     pub cooldown: Option<InteractionCooldown>
-}
-
-#[packet_field]
-pub struct InteractionRules {
-    pub blocked_by_bypass_index: i32,
-    pub blocking_bypass_index: i32,
-    pub interrupted_by_bypass_index: i32,
-    pub interrupting_bypass_index: i32,
-    pub blocked_by: Vec<InteractionType>,
-    pub blocking: Vec<InteractionType>,
-    pub interrupted_by: Vec<InteractionType>,
-    pub interrupting: Vec<InteractionType>,
-}
-
-#[packet_enum]
-#[derive(Eq, PartialEq, Hash)]
-pub enum GameMode {
-    Adventure,
-    Creative
 }

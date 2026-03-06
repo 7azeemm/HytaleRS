@@ -37,3 +37,4 @@ pub mod unarmed_interaction;
 pub mod root_interactions;
 pub mod block_type;
 pub mod item;
+pub mod interaction;

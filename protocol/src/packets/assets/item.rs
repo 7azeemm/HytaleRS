@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
 use crate::objects::objects::{Color, ColorLight, Direction, FloatRange, Vec2f, Vec3f};
-use crate::packets::assets::builder_tools::ItemBuilderToolData;
+use crate::packets::builder_tools::ItemBuilderToolData;
 use crate::packets::assets::entity_effect::ValueType;
-use crate::packets::assets::interaction_type::InteractionType;
+use crate::packets::assets::interactions::interaction::GameMode;
+use crate::packets::assets::interactions::interaction_type::InteractionType;
 use crate::packets::assets::item_animations::ItemPullbackConfigPacket;
 use crate::packets::assets::model_particle::{EntityPart, ModelParticlePacket};
-use crate::packets::assets::root_interactions::GameMode;
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 54, max_size = 0x64000000, compressed)]

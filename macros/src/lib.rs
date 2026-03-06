@@ -174,7 +174,7 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
         #input
 
         impl #name {
-            const LAYOUT: crate::io::packet::PacketLayout = #layout;
+            pub const LAYOUT: crate::io::packet::PacketLayout = #layout;
         }
 
         impl crate::io::codecs::PacketCodec for #name {
@@ -282,4 +282,52 @@ pub fn packet_enum(_args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+#[derive(Default)]
+struct InteractionAttrs {
+    id: Option<usize>,
+}
+
+impl InteractionAttrs {
+    fn parse(&mut self, meta: syn::meta::ParseNestedMeta) -> Result<()> {
+        if meta.path.is_ident("id") {
+            self.id = Some(meta.value()?.parse::<syn::LitInt>()?.base10_parse()?);
+            Ok(())
+        } else {
+            Err(meta.error("unsupported attribute"))
+        }
+    }
+}
+
+#[proc_macro_attribute]
+pub fn interaction(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut attrs = InteractionAttrs::default();
+    let parser = syn::meta::parser(|meta| attrs.parse(meta));
+    parse_macro_input!(args with parser);
+
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let Some(id) = attrs.id else {
+        return Error::new(proc_macro2::Span::call_site(), "missing `id`")
+            .to_compile_error()
+            .into();
+    };
+
+    quote! {
+        #input
+
+        impl crate::packets::assets::interactions::interaction::InteractionKind for #name {
+            fn id(&self) -> usize { #id }
+
+            fn encode(&self, enc: &mut crate::io::encoder::Encoder) -> crate::io::errors::PacketResult<()> {
+                crate::io::codecs::PacketCodec::encode(self, enc)
+            }
+
+            fn clone_box(&self) -> Box<dyn crate::packets::assets::interactions::interaction::InteractionKind> {
+                Box::new(self.clone())
+            }
+        }
+    }.into()
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
 use crate::objects::objects::{Color, RangeFloat};
-use crate::packets::assets::interaction_type::InteractionType;
+use crate::packets::assets::interactions::interaction_type::InteractionType;
 use crate::packets::assets::model_particle::ModelParticlePacket;
 use crate::packets::assets::update_type::UpdateType;
 

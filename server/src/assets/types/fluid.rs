@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use protocol::io::codecs::FixedOption;
 use protocol::objects::objects::{Color, ColorLight, Opacity};
 use protocol::packets::assets::fluid::{FluidDrawType, FluidPacket, UpdateFluids};
-use protocol::packets::assets::interaction_type::InteractionType;
+use protocol::packets::assets::interactions::interaction_type::InteractionType;
 use crate::assets::types::block_textures::BlockTextures;
 use protocol::packets::assets::shader_type::ShaderType;
 use protocol::packets::assets::update_type::UpdateType;

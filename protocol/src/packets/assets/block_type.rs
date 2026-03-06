@@ -3,7 +3,7 @@ use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
 use crate::objects::objects::{Color, ColorLight, Opacity, Vec3f, Vec3i};
 use crate::packets::assets::block_textures::BlockTexturesPacket;
-use crate::packets::assets::interaction_type::InteractionType;
+use crate::packets::assets::interactions::interaction_type::InteractionType;
 use crate::packets::assets::model_particle::ModelParticlePacket;
 use crate::packets::assets::recipes::MaterialQuantityPacket;
 use crate::packets::assets::shader_type::ShaderType;

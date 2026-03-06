@@ -23,6 +23,7 @@ use crate::assets::types::fieldcraft_categories::FieldcraftCategories;
 use crate::assets::types::fluid::Fluid;
 use crate::assets::types::fluid_fx::FluidFX;
 use crate::assets::types::hitbox_collision::HitboxCollisionConfig;
+use crate::assets::types::interaction::Interaction;
 use crate::assets::types::item::Item;
 use crate::assets::types::item_animations::ItemAnimations;
 use crate::assets::types::item_category::ItemCategory;
@@ -95,6 +96,7 @@ impl StoreRegistry {
         self.register::<RootInteraction>().await;
         self.register::<BlockType>().await;
         self.register::<Item>().await;
+        self.register::<Interaction>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {

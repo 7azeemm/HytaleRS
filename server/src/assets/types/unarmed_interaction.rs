@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
-use protocol::packets::assets::interaction_type::InteractionType;
-use protocol::packets::assets::unarmed_interaction::UpdateUnarmedInteractions;
+use protocol::packets::assets::interactions::interaction_type::InteractionType;
+use protocol::packets::assets::interactions::unarmed_interaction::UpdateUnarmedInteractions;
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
 
