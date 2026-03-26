@@ -37,7 +37,7 @@ pub struct ParticleSpawnerPacket {
     pub light_influence: f32,
     pub linear_filtering: bool,
     pub particle_life_span: FixedOption<RangeFloat>,
-    pub intersection_highlight: FixedOption<IntersectionHighlight>,
+    pub intersection_highlight: FixedOption<IntersectionHighlightPacket>,
     pub id: Option<String>,
     pub particle: Option<ParticlePacket>,
     pub uv_motion: Option<UVMotionPacket>,
@@ -100,10 +100,8 @@ pub struct UVMotionPacket {
     pub texture: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
-pub struct IntersectionHighlight {
+pub struct IntersectionHighlightPacket {
     pub highlight_threshold: f32,
     pub highlight_color: FixedOption<Color>
 }

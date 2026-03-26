@@ -12,6 +12,10 @@ use crate::assets::asset_type::{Asset, AssetType};
 pub struct BlockType {
     pub id: String,
     pub parent: Option<String>,
+    pub unknown: bool,
+    pub group: Option<String>,
+    pub block_particle_set_id: Option<String>,
+    pub block_breaking_decal_id: Option<String>,
 }
 
 impl AssetType for BlockType {
@@ -41,8 +45,9 @@ impl AssetType for BlockType {
         let mut block_types = HashMap::new();
 
         for (i, (id, asset)) in map.iter().enumerate() {
+            let d = &asset.data;
             block_types.insert(i as i32, BlockTypePacket {
-                unknown: false,
+                unknown: d.unknown,
                 draw_type: DrawType::Empty,
                 material: BlockMaterial::Empty,
                 opacity: Opacity::Solid,
@@ -69,19 +74,20 @@ impl AssetType for BlockType {
                 placement_settings: Default::default(),
                 ignore_support_when_placed: false,
                 transition_to_tag: 0,
-                item: Some("hm".to_owned()),
-                name: Some("idk".to_owned()),
+                item: Some(id.to_owned()),
+                name: Some(id.to_owned()),
                 shader_effect: vec![],
-                model: None,
+                model: Some(id.to_owned()),
                 model_texture: vec![],
                 model_animation: None,
                 support: Default::default(),
                 supporting: Default::default(),
                 cube_textures: vec![],
                 cube_side_mask_texture: None,
+                conditional_sounds: vec![],
                 particles: vec![],
-                block_particle_set_id: None,
-                block_breaking_decal_id: None,
+                block_particle_set_id: d.block_particle_set_id.clone(),
+                block_breaking_decal_id: d.block_breaking_decal_id.clone(),
                 transition_texture: None,
                 transition_to_groups: vec![],
                 interaction_hint: None,
@@ -90,7 +96,7 @@ impl AssetType for BlockType {
                 rail: None,
                 interactions: Default::default(),
                 states: Default::default(),
-                tag_indexes: vec![],
+                tag_indexes: vec![1],
                 bench: None,
                 connected_block_rule_set: None,
             });
@@ -99,10 +105,10 @@ impl AssetType for BlockType {
         UpdateBlockTypes {
             update_type: UpdateType::Init,
             max_id: block_types.len() as i32,
-            update_block_textures: true,
-            update_model_textures: true,
-            update_models: true,
-            update_map_geometry: true,
+            update_block_textures: false,
+            update_model_textures: false,
+            update_models: false,
+            update_map_geometry: false,
             block_types,
         }
     }

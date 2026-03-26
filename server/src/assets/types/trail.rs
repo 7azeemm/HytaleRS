@@ -4,10 +4,11 @@ use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::objects::objects::{Range, Vec2i};
 use protocol::packets::assets::fx_render_mode::FXRenderMode;
-use protocol::packets::assets::particle_spawner::IntersectionHighlight;
+use protocol::packets::assets::particle_spawner::IntersectionHighlightPacket;
 use protocol::packets::assets::trail::{Edge, TrailPacket, UpdateTrails};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
+use crate::assets::types::particle_spawner::IntersectionHighlight;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "PascalCase", default)]
@@ -62,19 +63,22 @@ impl AssetType for Trail {
 
         for (id, asset) in map.iter() {
             trails.insert(id.clone(), TrailPacket {
-                life_span: 0,
-                roll: 0.0,
+                life_span: asset.data.life_span,
+                roll: asset.data.roll,
                 start: Default::default(),
                 end: Default::default(),
-                light_influence: 0.0,
+                light_influence: asset.data.light_influence,
                 render_mode: Default::default(),
-                intersection_highlight: Default::default(),
-                smooth: false,
+                intersection_highlight: IntersectionHighlightPacket {
+                    highlight_threshold: 0.0,
+                    highlight_color: Default::default(),
+                },
+                smooth: asset.data.smooth,
                 frame_size: Default::default(),
                 frame_range: Default::default(),
                 frame_life_span: 0,
                 id: Some(id.clone()),
-                texture: None,
+                texture: asset.data.texture.clone(),
             });
             break;
         }

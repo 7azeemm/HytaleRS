@@ -1,6 +1,7 @@
 use crate::io::codecs::{FixedString, VarList, VarString};
 use macros::{packet, packet_enum, packet_field};
 use uuid::Uuid;
+use crate::packets::message::FormattedMessage;
 
 #[packet(id = 0, max_size = 38013)]
 pub struct Connect {
@@ -28,16 +29,30 @@ pub struct HostAddress {
     pub host: VarString<256>,
 }
 
-#[packet(id = 1, max_size = 16384007)]
-pub struct Disconnect {
-    pub cause: DisconnectCause,
-    pub reason: Option<String>,
+#[packet(id = 1, max_size = 2)]
+pub struct ClientDisconnect {
+    pub reason: ClientDisconnectReason,
+    pub disconnect_type: DisconnectType,
 }
 
 #[packet_enum]
-pub enum DisconnectCause {
+pub enum ClientDisconnectReason {
+    PlayerLeave,
+    PlayerAbort,
+    UserLeave,
+    Crash
+}
+
+#[packet_enum]
+pub enum DisconnectType {
     Disconnect,
     Crash,
+}
+
+#[packet(id = 2, max_size = 0x64000000)]
+pub struct ServerDisconnect {
+    pub disconnect_type: DisconnectType,
+    pub reason: Option<FormattedMessage>,
 }
 
 #[packet(id = 11, max_size = 49171)]

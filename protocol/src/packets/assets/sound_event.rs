@@ -20,6 +20,7 @@ pub struct SoundEventPacket {
     pub prevent_sound_interruption: bool,
     pub start_attenuation_distance: f32,
     pub max_distance: f32,
+    pub spatial_blend: f32,
     pub audio_category: i32,
     pub id: Option<String>,
     pub layers: Vec<SoundEventLayerPacket>

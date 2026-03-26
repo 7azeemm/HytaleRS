@@ -131,6 +131,7 @@ impl AssetType for SoundEvent {
                 prevent_sound_interruption: asset.data.prevent_sound_interruption,
                 start_attenuation_distance: asset.data.start_attenuation_distance,
                 max_distance: asset.data.max_distance,
+                spatial_blend: 0.0,
                 audio_category: 0, // Fixme
                 layers: asset.data.layers.iter().map(|l| SoundEventLayerPacket {
                     volume: l.volume,

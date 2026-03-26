@@ -4,7 +4,7 @@ use macros::{packet, packet_field};
 use crate::io::codecs::FixedOption;
 use crate::objects::objects::{ColorAlpha, Range, Vec2i};
 use crate::packets::assets::fx_render_mode::FXRenderMode;
-use crate::packets::assets::particle_spawner::IntersectionHighlight;
+use crate::packets::assets::particle_spawner::IntersectionHighlightPacket;
 use crate::packets::assets::update_type::UpdateType;
 
 #[packet(id = 48, max_size = 0x64000000, compressed)]
@@ -21,7 +21,7 @@ pub struct TrailPacket {
     pub end: FixedOption<Edge>,
     pub light_influence: f32,
     pub render_mode: FXRenderMode,
-    pub intersection_highlight: IntersectionHighlight,
+    pub intersection_highlight: IntersectionHighlightPacket,
     pub smooth: bool,
     pub frame_size: FixedOption<Vec2i>,
     pub frame_range: FixedOption<Range>,

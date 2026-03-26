@@ -190,15 +190,10 @@ impl AssetType for Weather {
             break;
         }
 
-        let packet = UpdateWeathers {
+        UpdateWeathers {
             update_type: UpdateType::Init,
             max_id: weathers.len() as i32,
             weathers
-        };
-
-        let bytes = Packet::encode(&packet).unwrap();
-        let packet: UpdateWeathers = Packet::decode(&bytes).unwrap();
-
-        packet
+        }
     }
 }

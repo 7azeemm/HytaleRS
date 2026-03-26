@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use macros::{packet, packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
 use crate::objects::objects::{Color, ColorLight, Direction, FloatRange, Vec2f, Vec3f};
-use crate::packets::builder_tools::ItemBuilderToolData;
+use crate::packets::builder_tools::{BuilderToolState};
 use crate::packets::assets::entity_effect::ValueType;
 use crate::packets::assets::interactions::interaction::GameMode;
 use crate::packets::assets::interactions::interaction_type::InteractionType;
@@ -52,10 +52,11 @@ pub struct ItemBasePacket {
     pub weapon: Option<ItemWeapon>,
     pub armor: Option<ItemArmor>,
     pub utility: Option<ItemUtility>,
-    pub builder_tool_data: Option<ItemBuilderToolData>,
+    pub builder_tool_data: Option<BuilderToolState>,
     pub item_entity: Option<ItemEntityConfig>,
     pub set: Option<String>,
     pub categories: Vec<String>,
+    pub sub_category: Option<String>,
     pub particles: Vec<ModelParticlePacket>,
     pub first_person_particles: Vec<ModelParticlePacket>,
     pub trails: Vec<ModelTrail>,
@@ -66,6 +67,7 @@ pub struct ItemBasePacket {
     pub tag_indexes: Vec<i32>,
     pub item_appearance_conditions: HashMap<String, Vec<ItemAppearanceCondition>>,
     pub display_entity_stats_hud: Vec<i32>,
+    pub hud_ui: Vec<ItemHudUI>
 }
 
 #[packet_field]
@@ -233,4 +235,16 @@ pub struct ItemAppearanceCondition {
     pub model: Option<String>,
     pub texture: Option<String>,
     pub model_vfx_id: Option<String>
+}
+
+#[packet_field]
+pub struct ItemHudUI {
+    pub item_hud_ui_type: ItemHudUIType,
+    pub path: Option<String>
+}
+
+#[packet_enum]
+pub enum ItemHudUIType {
+    Hud,
+    Legend
 }

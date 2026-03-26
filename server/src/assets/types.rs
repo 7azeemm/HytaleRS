@@ -38,3 +38,7 @@ pub mod root_interactions;
 pub mod block_type;
 pub mod item;
 pub mod interaction;
+pub mod camera_shake;
+pub mod view_bobbing;
+pub mod block_group;
+pub mod projectile_config;

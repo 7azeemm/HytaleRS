@@ -53,6 +53,7 @@ impl AssetType for ItemCategory {
                     name: Some(c.name.clone()),
                     icon: Some(c.icon.clone()),
                     children: vec![],
+                    sub_categories: vec![],
                 })
                 .collect();
 
@@ -63,6 +64,7 @@ impl AssetType for ItemCategory {
                 order: asset.data.order,
                 info_display_mode: asset.data.info_display_mode,
                 children,
+                sub_categories: vec![],
             });
         }
 

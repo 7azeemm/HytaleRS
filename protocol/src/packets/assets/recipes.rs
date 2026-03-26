@@ -33,7 +33,7 @@ pub struct MaterialQuantityPacket {
 pub struct BenchRequirementPacket {
     pub bench_type: BenchType,
     pub required_tier_level: i32,
-    pub id: Option<String>,
+    pub id: String,
     pub categories: Vec<String>
 }
 

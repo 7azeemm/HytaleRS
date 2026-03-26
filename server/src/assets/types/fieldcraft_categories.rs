@@ -51,6 +51,7 @@ impl AssetType for FieldcraftCategories {
                 order: 0,
                 info_display_mode: ItemGridInfoDisplayMode::Tooltip,
                 children: vec![],
+                sub_categories: vec![],
             });
         }
 

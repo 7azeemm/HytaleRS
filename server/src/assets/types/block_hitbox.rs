@@ -51,7 +51,7 @@ impl AssetType for BlockHitBox {
         UpdateBlockHitBoxes {
             update_type: UpdateType::Init,
             max_id: block_hitboxes.len() as i32,
-            block_hitboxes: block_hitboxes,
+            block_hitboxes,
         }
     }
 }

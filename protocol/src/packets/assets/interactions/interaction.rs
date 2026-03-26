@@ -5,7 +5,6 @@ use crate::io::codecs::{FixedOption, PacketCodec};
 use crate::io::decoder::Decoder;
 use crate::io::encoder::Encoder;
 use crate::io::errors::{PacketError, PacketResult};
-use crate::io::packet::PacketLayout;
 use crate::objects::objects::{Direction, Vec3f};
 use crate::packets::assets::entity_effect::MovementEffectsPacket;
 use crate::packets::assets::interactions::interaction_type::InteractionType;

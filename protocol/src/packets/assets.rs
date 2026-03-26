@@ -40,3 +40,7 @@ pub mod environment;
 pub mod block_type;
 pub mod item;
 pub mod interactions;
+pub mod camera_shake;
+pub mod view_bobbing;
+pub mod block_group;
+pub mod projectile_config;

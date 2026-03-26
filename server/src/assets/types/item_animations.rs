@@ -50,7 +50,7 @@ impl AssetType for ItemAnimations {
                 wiggle_weights: Default::default(),
                 pullback_config: Default::default(),
                 use_first_person_override: false,
-                id: None,
+                id: Some(asset.data.id.clone()),
                 animations: Default::default(),
                 camera: None,
             });

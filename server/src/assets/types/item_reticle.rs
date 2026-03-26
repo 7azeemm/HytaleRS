@@ -44,7 +44,7 @@ impl AssetType for ItemReticles {
 
         for (i, (id, asset)) in map.iter().enumerate() {
             item_reticle_configs.insert(i as i32, ItemReticleConfig {
-                id: None,
+                id: Some(asset.data.id.clone()),
                 base: asset.data.base.clone(),
                 server_events: Default::default(),
                 client_events: Default::default(),

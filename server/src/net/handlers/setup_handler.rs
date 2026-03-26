@@ -9,15 +9,16 @@ use crate::net::handlers::packet_handler::{HandlerAction, PacketHandler};
 use crate::server::HytaleServer;
 use log::info;
 use protocol::io::codecs::VarList;
-use protocol::packets::setup::{
-    Asset, RequestAssets, ServerInfo, WorldLoadFinished, WorldLoadProgress, WorldSettings,
-};
+use protocol::packets::setup::{Asset, JoinWorld, PlayerOptions, RequestAssets, ServerInfo, ViewRadius, WorldLoadFinished, WorldLoadProgress, WorldSettings};
 use std::sync::Arc;
+use uuid::Uuid;
 use protocol::packets::assets::translations::UpdateTranslations;
 use protocol::packets::assets::update_type::UpdateType;
+use protocol::packets::message::FormattedMessage;
 
 pub struct SetupHandler {
     pub player_auth: PlayerAuthentication,
+    pub client_view_radius_chunks: i32
 }
 
 #[async_trait::async_trait]
@@ -30,19 +31,20 @@ impl PacketHandler for SetupHandler {
     ) -> HandlerAction {
         match packet_id {
             23 => handle_packet!(self, RequestAssets, data, handle_request_assets, cx),
+            32 => handle_packet!(self, ViewRadius, data, handle_view_radius, cx),
+            33 => handle_packet!(self, PlayerOptions, data, handle_player_options, cx),
             _ => HandlerAction::Error(format!("Unexpected packet {} in setup", packet_id)),
         }
     }
 
     async fn register(&mut self, cx: &mut ConnectionContext) {
         let server_config = HytaleServer::get().config.read().await;
-        let setup_world_timeout = server_config.timeouts.setup_world_settings;
         let server_name = server_config.server_name.clone();
         let motd = server_config.motd.clone();
         let max_players = server_config.max_players as i32;
-        drop(server_config);
 
-        cx.set_timeout(setup_world_timeout).await;
+        cx.set_timeout(server_config.timeouts.setup_world_settings).await;
+        drop(server_config);
 
         let required_assets: VarList<Arc<Asset>, _> = COMMON_ASSET_REGISTRY.get_assets().into();
         info!("Sending {} common assets to client", required_assets.len());
@@ -57,6 +59,7 @@ impl PacketHandler for SetupHandler {
             max_players,
             server_name: Some(server_name),
             motd: Some(motd),
+            fallback_server: None,
         })
         .await;
     }
@@ -69,6 +72,7 @@ impl SetupHandler {
         cx: &mut ConnectionContext,
     ) -> HandlerAction {
         info!("Client requested {} assets", packet.assets.len());
+        // TODO: send missing common assets
 
         STORE_REGISTRY.send_assets(cx).await;
 
@@ -81,11 +85,35 @@ impl SetupHandler {
         }).await;
 
         cx.send(WorldLoadProgress {
-            status: "Loading World".to_owned(),
+            status: Some(FormattedMessage::new("Loading World")),
             percent_complete: 0,
             percent_complete_subitem: 0,
         }).await;
         cx.send(WorldLoadFinished {}).await;
+
+        HandlerAction::Continue
+    }
+
+    async fn handle_view_radius(&mut self, packet: ViewRadius, cx: &mut ConnectionContext) -> HandlerAction {
+        self.client_view_radius_chunks = ((packet.value as f32) / 32.0).ceil() as i32;
+        HandlerAction::Continue
+    }
+
+    async fn handle_player_options(&self, packet: PlayerOptions, cx: &mut ConnectionContext) -> HandlerAction {
+        if let Some(skin) = packet.skin {
+            //TODO: validate
+        }
+
+        let server_config = HytaleServer::get().config.read().await;
+        cx.set_timeout(server_config.timeouts.setup_add_to_universe).await;
+
+        info!("Adding to the Universe");
+
+        // cx.send(JoinWorld {
+        //     clear_world: false,
+        //     fade_in_out: false,
+        //     world_uuid: Uuid::new_v4(),
+        // }).await;
 
         HandlerAction::Continue
     }

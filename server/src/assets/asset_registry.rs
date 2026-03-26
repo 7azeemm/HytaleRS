@@ -9,11 +9,13 @@ use tokio::sync::RwLock;
 use crate::assets::types::ambience_fx::AmbienceFX;
 use crate::assets::types::audio_category::AudioCategory;
 use crate::assets::types::block_breaking_decals::BlockBreakingDecal;
+use crate::assets::types::block_group::BlockGroup;
 use crate::assets::types::block_hitbox::BlockHitBox;
 use crate::assets::types::block_particle_set::BlockParticleSet;
 use crate::assets::types::block_set::BlockSet;
 use crate::assets::types::block_sound_set::BlockSoundSet;
 use crate::assets::types::block_type::BlockType;
+use crate::assets::types::camera_shake::CameraShake;
 use crate::assets::types::entity_effect::EntityEffect;
 use crate::assets::types::entity_stat_type::EntityStatType;
 use crate::assets::types::entity_ui_component::EntityUIComponent;
@@ -33,6 +35,7 @@ use crate::assets::types::item_sound_set::ItemSoundSet;
 use crate::assets::types::model_vfx::ModelVFX;
 use crate::assets::types::particle_spawner::ParticleSpawner;
 use crate::assets::types::particle_system::ParticleSystems;
+use crate::assets::types::projectile_config::ProjectileConfig;
 use crate::assets::types::recipes::CraftingRecipes;
 use crate::assets::types::repulsion::RepulsionConfig;
 use crate::assets::types::resource_type::ResourceTypes;
@@ -43,6 +46,7 @@ use crate::assets::types::sound_set::SoundSet;
 use crate::assets::types::tag_pattern::TagPattern;
 use crate::assets::types::trail::Trail;
 use crate::assets::types::unarmed_interaction::UnarmedInteraction;
+use crate::assets::types::view_bobbing::ViewBobbing;
 use crate::assets::types::weather::Weather;
 
 pub static STORE_REGISTRY: LazyLock<StoreRegistry> = LazyLock::new(|| StoreRegistry::new());
@@ -95,14 +99,18 @@ impl StoreRegistry {
         self.register::<UnarmedInteraction>().await;
         self.register::<RootInteraction>().await;
         self.register::<BlockType>().await;
-        self.register::<Item>().await;
         self.register::<Interaction>().await;
+        self.register::<Item>().await;
+        self.register::<CameraShake>().await;
+        self.register::<ViewBobbing>().await;
+        self.register::<BlockGroup>().await;
+        self.register::<ProjectileConfig>().await;
     }
 
     pub async fn register<T: AssetType + 'static>(&self) {
         let store = Arc::new(AssetStore::<T>::new());
         let name = store.name();
-        self.stores.write().await.insert(store.type_id(), store);
+        self.stores.write().await.insert(TypeId::of::<T>(), store);
 
         info!("Registered asset type: {} (path: {})", name, T::path());
     }
@@ -117,12 +125,12 @@ impl StoreRegistry {
         self.stores.read().await.values().cloned().collect()
     }
 
-    pub async fn get<T: AssetType + 'static>(&self) -> Option<Arc<AssetStore<T>>> {
+    pub async fn get<T: AssetType + 'static>(&self) -> Option<Arc<dyn StoreBase>> {
         self.stores
             .read()
             .await
             .get(&TypeId::of::<T>())
             .cloned()
-            .and_then(|store| store.as_any_arc().downcast::<AssetStore<T>>().ok())
+            // .and_then(|store| store.as_any_arc().downcast::<AssetStore<T>>().ok())
     }
 }

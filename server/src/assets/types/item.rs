@@ -62,7 +62,7 @@ impl AssetType for Item {
                 pullback_config: Default::default(),
                 clips_geometry: false,
                 render_deployable_preview: false,
-                id: None,
+                id: Some(asset.data.id.clone()),
                 model: None,
                 texture: None,
                 animation: None,
@@ -78,6 +78,7 @@ impl AssetType for Item {
                 item_entity: None,
                 set: None,
                 categories: vec![],
+                sub_category: None,
                 particles: vec![],
                 first_person_particles: vec![],
                 trails: vec![],
@@ -88,6 +89,7 @@ impl AssetType for Item {
                 tag_indexes: vec![],
                 item_appearance_conditions: Default::default(),
                 display_entity_stats_hud: vec![],
+                hud_ui: vec![],
             });
             break;
         }

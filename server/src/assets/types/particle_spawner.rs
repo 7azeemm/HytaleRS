@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use protocol::io::codecs::FixedOption;
 use protocol::objects::objects::{Color, Range, RangeFloat, RangeVec2f, RangeVec3f, Size, Vec3f};
 use protocol::packets::assets::fx_render_mode::FXRenderMode;
-use protocol::packets::assets::particle_spawner::{EmitShape, InitialVelocity, IntersectionHighlight, ParticleAnimationFramePacket, ParticleAttractorPacket, ParticleCollisionAction, ParticleCollisionBlockType, ParticleCollisionPacket, ParticlePacket, ParticleRotationInfluence, ParticleScaleRatioConstraint, ParticleSpawnerPacket, ParticleUVOption, SoftParticle, UVMotionCurveType, UVMotionPacket, UpdateParticleSpawners};
+use protocol::packets::assets::particle_spawner::{EmitShape, InitialVelocity, IntersectionHighlightPacket, ParticleAnimationFramePacket, ParticleAttractorPacket, ParticleCollisionAction, ParticleCollisionBlockType, ParticleCollisionPacket, ParticlePacket, ParticleRotationInfluence, ParticleScaleRatioConstraint, ParticleSpawnerPacket, ParticleUVOption, SoftParticle, UVMotionCurveType, UVMotionPacket, UpdateParticleSpawners};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
 
@@ -42,6 +42,13 @@ pub struct ParticleSpawner {
     #[serde(rename = "UVMotion")]
     pub uv_motion: UVMotion,
     pub attractors: Vec<ParticleAttractor>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
+pub struct IntersectionHighlight {
+    pub highlight_threshold: f32,
+    pub highlight_color: FixedOption<String>//Color
 }
 
 impl Default for ParticleSpawner {
@@ -118,7 +125,7 @@ pub struct ParticleAnimationFrame {
     pub frame_index: Option<Range>,
     pub scale: Option<RangeVec2f>,
     pub rotation: Option<RangeVec3f>,
-    pub color: Option<Color>,
+    pub color: Option<String>,//Color
     pub opacity: f32,
 }
 
@@ -251,9 +258,9 @@ impl AssetType for ParticleSpawner {
                 camera_offset: d.camera_offset,
                 use_emit_direction: d.use_emit_direction,
                 life_span: d.life_span,
-                spawn_rate: FixedOption(d.spawn_rate.clone()),
+                spawn_rate: d.spawn_rate.clone().into(),
                 spawn_burst: d.spawn_burst,
-                wave_delay: FixedOption(d.wave_delay.clone()),
+                wave_delay: d.wave_delay.clone().into(),
                 total_particles: FixedOption(d.total_particles.clone().into()),
                 max_concurrent_particles: d.max_concurrent_particles,
                 initial_velocity: FixedOption(d.initial_velocity.clone().into()),
@@ -274,35 +281,60 @@ impl AssetType for ParticleSpawner {
                 light_influence: d.light_influence,
                 linear_filtering: d.linear_filtering,
                 particle_life_span: FixedOption(d.particle_life_span.clone()),
-                intersection_highlight: FixedOption(d.intersection_highlight.clone().into()),
-                id: None,
-                // particle: d.particle.clone().map(|p| {
-                //     ParticlePacket {
-                //         frame_size: p.frame_size.into(),
-                //         uv_option: p.uv_option,
-                //         scale_ratio_constraint: p.scale_ratio_constraint,
-                //         soft_particles: p.soft_particles,
-                //         soft_particles_fade_factor: p.soft_particles_fade_factor,
-                //         use_sprite_blending: p.use_sprite_blending,
-                //         initial_animation_frame: Default::default(),
-                //         collision_animation_frame: Default::default(),
-                //         texture_path: p.texture_path.clone(),
-                //         animation_frames: Default::default(),
-                //     }
-                // }),
-                // uv_motion: Some(UVMotionPacket {
-                //     add_random_uv_offset: d.uv_motion.add_random_uv_offset,
-                //     speed_x: d.uv_motion.speed_x,
-                //     speed_y: d.uv_motion.speed_y,
-                //     scale: d.uv_motion.scale,
-                //     strength: d.uv_motion.strength,
-                //     strength_curve_type: d.uv_motion.strength_curve_type,
-                //     texture: d.uv_motion.texture.clone(),
-                // }),
-                // attractors,
-                particle: None,
-                uv_motion: None,
-                attractors: vec![],
+                intersection_highlight: FixedOption(IntersectionHighlightPacket {
+                    highlight_threshold: d.intersection_highlight.highlight_threshold,
+                    highlight_color: FixedOption(Some(Color::default())),
+                }.into()),
+                id: Some(id.clone()),
+                particle: d.particle.clone().map(|p| {
+                    let mut frames = HashMap::default();
+                    for (i, frame) in p.animation_frames {
+                        frames.insert(i, ParticleAnimationFramePacket {
+                            frame_index: frame.frame_index.clone().into(),
+                            scale: frame.scale.clone().into(),
+                            rotation: frame.rotation.clone().into(),
+                            color: FixedOption(Color::default().into()),
+                            opacity: frame.opacity,
+                        });
+                    }
+
+                    ParticlePacket {
+                        frame_size: p.frame_size.into(),
+                        uv_option: p.uv_option,
+                        scale_ratio_constraint: p.scale_ratio_constraint,
+                        soft_particles: p.soft_particles,
+                        soft_particles_fade_factor: p.soft_particles_fade_factor,
+                        use_sprite_blending: p.use_sprite_blending,
+                        initial_animation_frame: FixedOption::from(p.initial_animation_frame.clone()
+                            .map(|a| ParticleAnimationFramePacket {
+                                frame_index: a.frame_index.clone().into(),
+                                scale: a.scale.clone().into(),
+                                rotation: a.rotation.clone().into(),
+                                color: FixedOption(Color::default().into()),
+                                opacity: a.opacity,
+                            })),
+                        collision_animation_frame: FixedOption::from(p.collision_animation_frame.clone()
+                            .map(|a| ParticleAnimationFramePacket {
+                                frame_index: a.frame_index.clone().into(),
+                                scale: a.scale.clone().into(),
+                                rotation: a.rotation.clone().into(),
+                                color: FixedOption(Color::default().into()),
+                                opacity: a.opacity,
+                            })),
+                        texture_path: p.texture_path.clone(),
+                        animation_frames: frames,
+                    }
+                }),
+                uv_motion: Some(UVMotionPacket {
+                    add_random_uv_offset: d.uv_motion.add_random_uv_offset,
+                    speed_x: d.uv_motion.speed_x,
+                    speed_y: d.uv_motion.speed_y,
+                    scale: d.uv_motion.scale,
+                    strength: d.uv_motion.strength,
+                    strength_curve_type: d.uv_motion.strength_curve_type,
+                    texture: d.uv_motion.texture.clone(),
+                }),
+                attractors,
             });
         }
 

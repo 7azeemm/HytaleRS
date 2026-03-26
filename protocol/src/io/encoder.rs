@@ -42,15 +42,11 @@ impl Scope {
 
         let offsets = match layout.var_field_count <= 1 {
             true => None,
-            false => {
-                let null_bits_size = layout.opt_field_count.div_ceil(8);
-                let offsets_pos = pos + null_bits_size + layout.fixed_block_size;
-                Some(Offsets {
-                    buf: Vec::new(),
-                    pos: offsets_pos,
-                    var_pos: pos + layout.fixed_block_size,
-                })
-            }
+            false => Some(Offsets {
+                buf: Vec::new(),
+                pos: pos + layout.opt_field_count.div_ceil(8) + layout.fixed_block_size,
+                var_pos: pos + layout.fixed_block_size,
+            })
         };
 
         Self {
@@ -185,7 +181,7 @@ impl Encoder {
                 byte |= 0x80;
             }
 
-            self.write_byte(byte);
+            self.buf.push(byte);
             if value == 0 {
                 break;
             }

@@ -4,17 +4,10 @@ use crate::io::codecs::FixedOption;
 use crate::packets::assets::block_type::Rotation;
 
 #[packet_field]
-pub struct ItemBuilderToolData {
-    pub ui: Vec<String>,
-    pub tools: Vec<BuilderToolState>,
-}
-
-#[packet_field]
 pub struct BuilderToolState {
     pub is_brush: bool,
     pub id: Option<String>,
-    pub brush_data: Option<BuilderToolBrushData>,
-    pub args: HashMap<String, BuilderToolArg>
+    pub args: Vec<BuilderToolArg>
 }
 
 #[packet_field]
@@ -46,7 +39,8 @@ pub struct BuilderToolBrushData {
 pub struct BuilderToolArg {
     pub required: bool,
     pub arg_type: BuilderToolArgType,
-    pub bool_arg: BuilderToolBoolArg,
+    pub id: Option<String>,
+    pub bool_arg: Option<BuilderToolBoolArg>,
     pub float_arg: Option<BuilderToolFloatArg>,
     pub int_arg: Option<BuilderToolIntArg>,
     pub brush_shape_arg: Option<BuilderToolBrushShapeArg>,

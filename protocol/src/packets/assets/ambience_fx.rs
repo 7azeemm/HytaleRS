@@ -57,7 +57,8 @@ pub struct AmbienceFXSoundPacket {
     pub block_sound_set_index: i32,
     pub altitude: AmbienceFXAltitude,
     pub frequency: FixedOption<RangeFloat>,
-    pub radius: FixedOption<Range>
+    pub radius: FixedOption<Range>,
+    pub max_bodies_per_emitter: bool,
 }
 
 #[packet_field]
@@ -84,6 +85,7 @@ pub struct AmbienceFXAmbientBedPacket {
 pub enum AmbienceFXSoundPlay3D {
     Random,
     LocationName,
+    LocationNameRandom,
     No
 }
 

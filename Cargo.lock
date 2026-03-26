@@ -1717,12 +1717,14 @@ dependencies = [
 name = "protocol"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "inventory",
  "log",
  "macros",
  "num_enum",
  "ordered-float",
  "serde",
+ "serde_json",
  "strum_macros",
  "uuid",
 ]

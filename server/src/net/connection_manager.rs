@@ -4,13 +4,14 @@ use crate::net::utils::rate_limiter::RateLimiter;
 use crate::net::utils::stage_timer::StageTimer;
 use log::{error, info, warn};
 use protocol::io::packet::Packet;
-use protocol::packets::connection::{Disconnect, DisconnectCause};
+use protocol::packets::connection::{ClientDisconnect, DisconnectType, ServerDisconnect};
 use quinn::{RecvStream, SendStream};
 use rustls::pki_types::CertificateDer;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::timeout;
+use protocol::packets::message::FormattedMessage;
 
 pub struct Connection {
     pub id: String,
@@ -43,11 +44,9 @@ impl Connection {
             match read_result {
                 Ok(Ok((packet_id, body))) => {
                     // Handle disconnect packet
-                    if packet_id == 0x01 {
-                        let reason = match decode::<Disconnect>(&body) {
-                            Some(packet) => {
-                                packet.reason.unwrap_or_else(|| packet.cause.to_string())
-                            }
+                    if packet_id == ClientDisconnect::ID {
+                        let reason = match decode::<ClientDisconnect>(&body) {
+                            Some(packet) => packet.reason.to_string(),
                             None => "Unknown".to_owned(),
                         };
 
@@ -118,9 +117,9 @@ impl ConnectionContext {
     // Todo: maybe can spawns a tokio task to send the packet
     pub async fn disconnect(&self, reason: &str) {
         info!("Disconnecting..., reason: {}", reason);
-        self.send(Disconnect {
-            cause: DisconnectCause::Disconnect,
-            reason: Some(reason.to_owned()),
+        self.send(ServerDisconnect {
+            disconnect_type: DisconnectType::Disconnect,
+            reason: Some(FormattedMessage::new(reason)),
         })
         .await;
         self.close().await;

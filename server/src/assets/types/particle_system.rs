@@ -3,8 +3,8 @@ use parking_lot::lock_api::RwLockReadGuard;
 use parking_lot::RawRwLock;
 use serde::{Deserialize, Serialize};
 use protocol::objects::objects::{Direction, RangeFloat, RangeVec3f, Vec3f};
-use protocol::packets::assets::particle_spawner::{InitialVelocity};
-use protocol::packets::assets::particle_system::{ParticleSystemPacket, UpdateParticleSystems};
+use protocol::packets::assets::particle_spawner::{InitialVelocity, ParticleAttractorPacket};
+use protocol::packets::assets::particle_system::{ParticleSpawnerGroupPacket, ParticleSystemPacket, UpdateParticleSystems};
 use protocol::packets::assets::update_type::UpdateType;
 use crate::assets::asset_type::{Asset, AssetType};
 use crate::assets::types::particle_spawner::ParticleAttractor;
@@ -90,16 +90,51 @@ impl AssetType for ParticleSystems {
         let mut systems = HashMap::new();
 
         for (id, asset) in map.iter() {
+            let spawners: Vec<ParticleSpawnerGroupPacket> = asset.data.spawners.iter()
+                .map(|p| {
+                    let attractors: Vec<ParticleAttractorPacket> = p.attractors.iter()
+                        .map(|a| {
+                            ParticleAttractorPacket {
+                                position: a.position.clone().into(),
+                                radial_axis: a.radial_axis.clone().into(),
+                                trail_position_multiplier: a.trail_position_multiplier,
+                                radius: a.radius,
+                                radial_acceleration: a.radial_acceleration,
+                                radial_tangent_acceleration: a.radial_tangent_acceleration,
+                                linear_acceleration: a.linear_acceleration.clone().into(),
+                                radial_impulse: a.radial_impulse,
+                                radial_tangent_impulse: a.radial_tangent_impulse,
+                                linear_impulse: a.linear_impulse.clone().into(),
+                                damping_multiplier: a.damping_multiplier.clone().into(),
+                            }
+                        })
+                        .collect();
+                    ParticleSpawnerGroupPacket {
+                        position_offset: p.position_offset.clone().into(),
+                        rotation_offset: p.rotation_offset.clone().into(),
+                        fixed_rotation: p.fixed_rotation,
+                        start_delay: p.start_delay,
+                        spawn_rate: p.spawn_rate.clone().into(),
+                        wave_delay: p.wave_delay.clone().into(),
+                        total_spawners: p.total_spawners,
+                        max_concurrent: p.max_concurrent,
+                        initial_velocity: p.initial_velocity.clone().into(),
+                        emit_offset: p.emit_offset.clone().into(),
+                        life_span: p.life_span.clone().into(),
+                        spawner_id: p.spawner_id.clone().into(),
+                        attractors,
+                    }
+                })
+                .collect();
+
             systems.insert(id.clone(), ParticleSystemPacket {
                 life_span: asset.data.life_span,
                 cull_distance: asset.data.cull_distance,
                 bounding_radius: asset.data.bounding_radius,
                 is_important: asset.data.is_important,
-                id: None,
-                // id: Some(id.clone()),
-                spawners: vec![],
+                id: Some(id.clone()),
+                spawners,
             });
-            break;
         }
 
         UpdateParticleSystems {

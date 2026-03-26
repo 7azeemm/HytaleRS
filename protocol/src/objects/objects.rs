@@ -3,7 +3,7 @@ use macros::{packet_enum, packet_field};
 use crate::io::codecs::FixedOption;
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Color {
     pub red: u8,
@@ -13,7 +13,7 @@ pub struct Color {
 
 //FIXME: these have custom serialize/deserialize logic
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct ColorAlpha {
     pub alpha: u8,
@@ -23,7 +23,7 @@ pub struct ColorAlpha {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct ColorLight {
     pub radius: u8,
@@ -32,8 +32,8 @@ pub struct ColorLight {
     pub blue: u8
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Direction {
     pub yaw: f32,
@@ -41,8 +41,8 @@ pub struct Direction {
     pub roll: f32
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Vec3f {
     pub x: f32,
@@ -50,16 +50,16 @@ pub struct Vec3f {
     pub z: f32
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Vec2f {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Vec2i {
     pub x: i32,
@@ -67,7 +67,7 @@ pub struct Vec2i {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Vec3d {
     pub x: f64,
@@ -76,7 +76,7 @@ pub struct Vec3d {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Vec3i {
     pub x: i32,
@@ -85,15 +85,19 @@ pub struct Vec3i {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct HitBox {
-    pub min: Vec3d,
-    pub max: Vec3d,
+    pub min_x: f32,
+    pub min_y: f32,
+    pub min_z: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+    pub max_z: f32
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct FloatRange {
     pub min: f32,
@@ -107,7 +111,7 @@ impl FloatRange {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Range {
     pub min: i32,
@@ -115,7 +119,7 @@ pub struct Range {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct RangeByte {
     pub min: u8,
@@ -124,7 +128,7 @@ pub struct RangeByte {
 
 //TODO: impl Copy to some structs
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct RangeFloat {
     pub min: f32,
@@ -132,7 +136,7 @@ pub struct RangeFloat {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct RangeVec3f {
     pub x: FixedOption<RangeFloat>,
@@ -141,7 +145,7 @@ pub struct RangeVec3f {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct RangeVec2f {
     pub x: FixedOption<RangeFloat>,
@@ -157,7 +161,7 @@ pub enum Opacity {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "PascalCase")]
+#[serde(rename_all = "PascalCase", default)]
 #[packet_field]
 pub struct Size {
     pub width: i32,

@@ -59,6 +59,7 @@ pub struct BlockTypePacket {
     pub supporting: HashMap<BlockNeighbor, Vec<BlockFaceSupport>>,
     pub cube_textures: Vec<BlockTexturesPacket>,
     pub cube_side_mask_texture: Option<String>,
+    pub conditional_sounds: Vec<ConditionalBlockSound>,
     pub particles: Vec<ModelParticlePacket>,
     pub block_particle_set_id: Option<String>,
     pub block_breaking_decal_id: Option<String>,
@@ -239,6 +240,12 @@ pub struct SoftBlock {
 pub struct ModelTexture {
     pub weight: f32,
     pub texture: Option<String>
+}
+
+#[packet_field]
+pub struct ConditionalBlockSound {
+    pub sound_event_index: i32,
+    pub ambience_fx_index: i32
 }
 
 #[packet_enum]

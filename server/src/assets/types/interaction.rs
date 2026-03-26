@@ -59,7 +59,6 @@ impl AssetType for Interaction {
                     camera: None,
                 }),
             });
-            break;
         }
 
         UpdateInteractions {

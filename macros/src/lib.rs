@@ -182,7 +182,8 @@ pub fn packet_field(_args: TokenStream, input: TokenStream) -> TokenStream {
                 let all_sized = true #(&& <#field_types as crate::io::codecs::PacketCodec>::SIZE.is_some())*;
 
                 if all_sized {
-                    Some(0 #(+ <#field_types as crate::io::codecs::PacketCodec>::SIZE.unwrap())*)
+                    let null_bytes = Self::LAYOUT.opt_field_count.div_ceil(8);
+                    Some(null_bytes #(+ <#field_types as crate::io::codecs::PacketCodec>::SIZE.unwrap())*)
                 } else {
                     None
                 }

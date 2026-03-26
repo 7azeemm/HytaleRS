@@ -20,7 +20,7 @@ use tokio::time::timeout;
 use uuid::Uuid;
 
 pub static SERVER_NETWORK_MANAGER: OnceCell<ServerNetworkManager> = OnceCell::new();
-pub const PROTOCOL_CRC: i32 = -1356075132;
+pub const PROTOCOL_CRC: i32 = 1080406952;
 const PROTOCOLS: &[&[u8]] = &[b"hytale/2", b"hytale/1"];
 const PORT: &str = "5520";
 
@@ -163,7 +163,7 @@ fn build_server_config(
 
 fn build_transport_config() -> anyhow::Result<TransportConfig> {
     let mut transport = TransportConfig::default();
-    transport.max_concurrent_bidi_streams(1u32.into());
+    transport.max_concurrent_bidi_streams(8u32.into());
     transport.max_concurrent_uni_streams(0u32.into());
     transport.receive_window(524_288u32.into());
     transport.stream_receive_window(131_072u32.into());

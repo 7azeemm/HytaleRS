@@ -261,6 +261,7 @@ impl HandshakePacketHandler {
                 referral_data: (*self.connect.referral_data).clone(),
                 referral_source: self.connect.referral_source.clone(),
             },
+            client_view_radius_chunks: 6
         }))
     }
 }

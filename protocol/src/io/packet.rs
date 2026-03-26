@@ -1,9 +1,16 @@
+use std::collections::HashMap;
 use crate::io::codecs::PacketCodec;
 use crate::io::decoder::Decoder;
 use crate::io::encoder::Encoder;
 use crate::io::errors::PacketResult;
 use std::fmt::Debug;
+use std::fs;
+use std::sync::atomic::Ordering;
 use std::sync::LazyLock;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use log::{info, warn};
+use crate::io::{DEBUG, DEBUG_PACKET_ID};
 
 inventory::collect!(PacketInfo);
 static PACKETS: LazyLock<Vec<Option<&'static PacketInfo>>> = LazyLock::new(|| {
@@ -20,6 +27,18 @@ static PACKETS: LazyLock<Vec<Option<&'static PacketInfo>>> = LazyLock::new(|| {
     v
 });
 
+static LOADED_PACKETS: LazyLock<HashMap<u32, Vec<u8>>> = LazyLock::new(|| {
+    let data = fs::read_to_string("D:\\HytaleRS\\packets.json").unwrap();
+    let raw: HashMap<u32, String> = serde_json::from_str(&data).unwrap();
+
+    let mut map = HashMap::with_capacity(raw.len());
+    for (id, encoded) in raw {
+        map.insert(id, STANDARD.decode(encoded.trim()).unwrap());
+    }
+
+    map
+});
+
 pub trait Packet: PacketCodec + Debug + Send + Sync {
     const LAYOUT: PacketLayout;
     const ID: u32;
@@ -28,9 +47,17 @@ pub trait Packet: PacketCodec + Debug + Send + Sync {
     const MAX_SIZE: u32;
 
     fn encode(&self) -> PacketResult<Vec<u8>> {
-        let mut encoder = Encoder::new(&Self::LAYOUT);
-        <Self as PacketCodec>::encode(self, &mut encoder)?;
-        Ok(encoder.finish())
+        if !vec![0, 1, 2, 11, 13].contains(&Self::ID) && let Some(bytes) = LOADED_PACKETS.get(&Self::ID) {
+            info!("Cloned Bytes for {}", Self::name());
+            Ok(bytes.clone())
+        } else {
+            warn!("Did not copy {}", Self::name());
+            let mut encoder = Encoder::new(&Self::LAYOUT);
+            if Self::ID == DEBUG_PACKET_ID { DEBUG.store(true, Ordering::Relaxed); }
+            <Self as PacketCodec>::encode(self, &mut encoder)?;
+            if Self::ID == DEBUG_PACKET_ID { DEBUG.store(false, Ordering::Relaxed); }
+            Ok(encoder.finish())
+        }
     }
 
     fn decode(data: &[u8]) -> PacketResult<Self> {

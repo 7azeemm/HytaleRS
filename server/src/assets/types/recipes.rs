@@ -120,14 +120,14 @@ impl AssetType for CraftingRecipes {
                 })
                 .collect();
 
-            // let bench_requirement: Vec<BenchRequirementPacket> = asset.data.bench_requirement.iter()
-            //     .map(|b| BenchRequirementPacket {
-            //         bench_type: b.bench_type,
-            //         required_tier_level: b.required_tier_level,
-            //         id: Some(b.id.clone()),
-            //         categories: b.categories.clone(),
-            //     })
-            //     .collect();
+            let bench_requirement: Vec<BenchRequirementPacket> = asset.data.bench_requirement.iter()
+                .map(|b| BenchRequirementPacket {
+                    bench_type: b.bench_type,
+                    required_tier_level: b.required_tier_level,
+                    id: b.id.clone(),
+                    categories: b.categories.clone(),
+                })
+                .collect();
 
             recipes.insert(id.clone(), CraftingRecipePacket {
                 knowledge_required: asset.data.knowledge_required,
@@ -140,12 +140,10 @@ impl AssetType for CraftingRecipes {
                     item_tag: asset.data.primary_output.tag_index,
                     quantity: asset.data.primary_output.quantity,
                     item_id: asset.data.primary_output.item_id.clone(),
-                    resource_type_id: None,
+                    resource_type_id: asset.data.primary_output.resource_type_id.clone(),
                 }),
-                // bench_requirement,
-                bench_requirement: vec![]
+                bench_requirement,
             });
-            break;
         }
 
         UpdateRecipes {

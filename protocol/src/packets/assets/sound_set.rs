@@ -21,5 +21,6 @@ pub enum SoundCategory {
     Music,
     Ambient,
     SFX,
-    UI
+    UI,
+    Voice
 }

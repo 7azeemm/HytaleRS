@@ -14,7 +14,16 @@ pub struct ItemCategoryPacket {
     pub id: Option<String>,
     pub name: Option<String>,
     pub icon: Option<String>,
-    pub children: Vec<ItemCategoryPacket>
+    pub children: Vec<ItemCategoryPacket>,
+    pub sub_categories: Vec<SubCategoryDefinition>
+}
+
+#[packet_field]
+pub struct SubCategoryDefinition {
+    pub order: i32,
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Default)]
