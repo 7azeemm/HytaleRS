@@ -33,6 +33,12 @@ HytaleRS is organized as a Cargo workspace:
 
 The network layer accepts QUIC connections and moves each connection through dedicated packet-handler stages. Handlers can continue processing, transition to a new stage, or terminate the connection. Protocol types remain separate from server behavior so packet serialization can evolve independently.
 
+## Reading the code
+
+Start with [server/src/main.rs](server/src/main.rs) for the boot sequence, then follow [server/src/net](server/src/net) for connections and packet-handler transitions. The [protocol/src](protocol/src) directory contains the wire-format types, while [macros/src](macros/src) contains code generation.
+
+Configuration is loaded from `config.json` in the working directory and saved with defaults by [server/src/config.rs](server/src/config.rs). See [server/src/utils/options.rs](server/src/utils/options.rs) for command-line declarations; some options describe planned behavior that is not fully wired up yet.
+
 ## Technology
 
 - Rust 2024 edition
@@ -51,11 +57,20 @@ A recent stable Rust toolchain with Rust 2024 edition support is required.
 ```bash
 git clone https://github.com/7azeemm/HytaleRS.git
 cd HytaleRS
-cargo check --workspace
-cargo build --workspace
+cargo check --locked --workspace
+cargo build --locked --workspace
 ```
 
 Running the server additionally requires compatible game assets and development data that are not distributed in this repository. Some development paths and protocol behavior are still being refactored, so a clean build does not imply a playable server.
+
+### Runtime caveats
+
+- The asset option defaults to `../HytaleAssets` and accepts an existing directory or ZIP path. Supply only assets you are authorized to use.
+- The network manager currently binds directly to `[::]:5520`; the declared `--bind` option does not yet control that listener.
+- Authentication and connection setup remain works in progress. Development builds should not be exposed as public servers.
+- Declared world, backup, migration, and plugin options do not mean those systems are complete.
+
+A successful compile is only a development check, not evidence of client compatibility or playable gameplay.
 
 ## Project status
 
